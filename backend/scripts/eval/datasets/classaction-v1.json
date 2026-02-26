@@ -1,0 +1,169 @@
+{
+  "name": "classaction-v1",
+  "description": "Seed evaluation dataset for class action settlement PDFs. Questions cover settlement details, eligibility, parties, deadlines, claim calculation, and table-based data.",
+  "pdf_corpus": [],
+  "questions": [
+    {
+      "question": "What is the total settlement amount?",
+      "gold_passages": [],
+      "expected_answer": {
+        "answer_text": "TODO: Fill in after selecting test PDFs",
+        "key_facts": []
+      },
+      "category": "settlement"
+    },
+    {
+      "question": "How much is the settlement fund?",
+      "gold_passages": [],
+      "expected_answer": {
+        "answer_text": "TODO: Fill in after selecting test PDFs",
+        "key_facts": []
+      },
+      "category": "settlement"
+    },
+    {
+      "question": "What are the terms of the settlement agreement?",
+      "gold_passages": [],
+      "expected_answer": {
+        "answer_text": "TODO: Fill in after selecting test PDFs",
+        "key_facts": []
+      },
+      "category": "settlement"
+    },
+    {
+      "question": "Who is eligible to participate in this class action?",
+      "gold_passages": [],
+      "expected_answer": {
+        "answer_text": "TODO: Fill in after selecting test PDFs",
+        "key_facts": []
+      },
+      "category": "eligibility"
+    },
+    {
+      "question": "What are the class member criteria?",
+      "gold_passages": [],
+      "expected_answer": {
+        "answer_text": "TODO: Fill in after selecting test PDFs",
+        "key_facts": []
+      },
+      "category": "eligibility"
+    },
+    {
+      "question": "Are there any exclusions from the class definition?",
+      "gold_passages": [],
+      "expected_answer": {
+        "answer_text": "TODO: Fill in after selecting test PDFs",
+        "key_facts": []
+      },
+      "category": "eligibility"
+    },
+    {
+      "question": "Who is the defendant in this case?",
+      "gold_passages": [],
+      "expected_answer": {
+        "answer_text": "TODO: Fill in after selecting test PDFs",
+        "key_facts": []
+      },
+      "category": "parties"
+    },
+    {
+      "question": "Who is the lead plaintiff?",
+      "gold_passages": [],
+      "expected_answer": {
+        "answer_text": "TODO: Fill in after selecting test PDFs",
+        "key_facts": []
+      },
+      "category": "parties"
+    },
+    {
+      "question": "Who is the settlement administrator?",
+      "gold_passages": [],
+      "expected_answer": {
+        "answer_text": "TODO: Fill in after selecting test PDFs",
+        "key_facts": []
+      },
+      "category": "parties"
+    },
+    {
+      "question": "What is the deadline to submit a claim?",
+      "gold_passages": [],
+      "expected_answer": {
+        "answer_text": "TODO: Fill in after selecting test PDFs",
+        "key_facts": []
+      },
+      "category": "deadlines"
+    },
+    {
+      "question": "When is the opt-out deadline?",
+      "gold_passages": [],
+      "expected_answer": {
+        "answer_text": "TODO: Fill in after selecting test PDFs",
+        "key_facts": []
+      },
+      "category": "deadlines"
+    },
+    {
+      "question": "When is the final approval hearing?",
+      "gold_passages": [],
+      "expected_answer": {
+        "answer_text": "TODO: Fill in after selecting test PDFs",
+        "key_facts": []
+      },
+      "category": "deadlines"
+    },
+    {
+      "question": "How is the claim amount calculated for each class member?",
+      "gold_passages": [],
+      "expected_answer": {
+        "answer_text": "TODO: Fill in after selecting test PDFs",
+        "key_facts": []
+      },
+      "category": "claim_calculation"
+    },
+    {
+      "question": "What determines how much each class member receives?",
+      "gold_passages": [],
+      "expected_answer": {
+        "answer_text": "TODO: Fill in after selecting test PDFs",
+        "key_facts": []
+      },
+      "category": "claim_calculation"
+    },
+    {
+      "question": "What is the maximum individual payout?",
+      "gold_passages": [],
+      "expected_answer": {
+        "answer_text": "TODO: Fill in after selecting test PDFs",
+        "key_facts": []
+      },
+      "category": "claim_calculation"
+    },
+    {
+      "question": "What fees are being requested by class counsel?",
+      "gold_passages": [],
+      "expected_answer": {
+        "answer_text": "TODO: Fill in after selecting test PDFs",
+        "key_facts": []
+      },
+      "category": "table"
+    },
+    {
+      "question": "What is the breakdown of settlement fund allocations?",
+      "gold_passages": [],
+      "expected_answer": {
+        "answer_text": "TODO: Fill in after selecting test PDFs",
+        "key_facts": []
+      },
+      "category": "table"
+    },
+    {
+      "question": "What are the payment tiers listed in the settlement?",
+      "gold_passages": [],
+      "expected_answer": {
+        "answer_text": "TODO: Fill in after selecting test PDFs",
+        "key_facts": []
+      },
+      "category": "table"
+    }
+  ]
+}

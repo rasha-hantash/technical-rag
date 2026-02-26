@@ -1,0 +1,28 @@
+version: '3'
+tasks:
+  db:migrate:up:
+    cmds:
+      - migrate
+        -path backend/migrations
+        -database "postgres://postgres:postgres@localhost:5432/pdf_llm_rag?sslmode=disable"
+        up
+
+  db:migrate:down:
+    desc: Rollback database migrations (use with caution)
+    cmds:
+      - migrate
+        -path backend/migrations
+        -database "postgres://postgres:postgres@localhost:5432/pdf_llm_rag?sslmode=disable"
+        down 1
+
+  db:migrate:down:all:
+    desc: Rollback ALL database migrations (DESTRUCTIVE)
+    cmds:
+      - migrate
+        -path backend/migrations
+        -database "postgres://postgres:postgres@localhost:5432/pdf_llm_rag?sslmode=disable"
+        down -all
+
+  # db:seed:
+  #   cmds:
+  #     - docker compose exec -T postgres psql -U admin -d pdf_llm_rag < scripts/seed-data.sql
