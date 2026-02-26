@@ -59,7 +59,7 @@ export function EvidenceCard({
               {source.book_title || shortFileName(source.file_path)}
             </span>
             {source.section_hierarchy && (
-              <span className="text-stone-400 truncate text-[10px]">
+              <span className="text-stone-400 truncate text-xs">
                 {source.section_hierarchy}
               </span>
             )}

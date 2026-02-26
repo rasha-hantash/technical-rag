@@ -124,8 +124,10 @@ def _classify_block(
     Returns:
         Tuple of (block_type, heading_level).
     """
-    # Code blocks: monospace font with sufficient length
-    if is_monospace and len(text) > 20:
+    # Code blocks: monospace font with sufficient length.
+    # Threshold of 10 chars captures short snippets (e.g. single-line function calls).
+    # Very short monospace text (<10 chars) is often inline formatting, not a code block.
+    if is_monospace and len(text) > 10:
         return "code_block", None
 
     # Check for list items
@@ -136,7 +138,11 @@ def _classify_block(
     ):
         return "list_item", None
 
-    # Headings: larger font or bold with short text
+    # Headings: larger font or bold with short text.
+    # These heuristics work well for most technical publishers (O'Reilly, Addison-Wesley,
+    # Manning) but may misclassify headings in books with unusual typography. When a TOC
+    # is available in the PDF, the chunking layer uses it as the primary source of truth
+    # for heading level assignment (see concept_aware_chunking in chunking.py).
     if font_size > median_size * 1.5:
         return "heading", 1
     if font_size > median_size * 1.2:

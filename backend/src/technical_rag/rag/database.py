@@ -533,13 +533,35 @@ class PgVectorStore:
         self, document_id, title: str | None = None, author: str | None = None,
         edition: str | None = None, publication_year: int | None = None,
     ) -> None:
-        """Update book metadata for a document."""
+        """Update book metadata for a document.
+
+        Only sets fields that are not None, so callers can do partial updates
+        without clearing existing values.
+        """
+        set_clauses = []
+        params: list = []
+        if title is not None:
+            set_clauses.append("title = %s")
+            params.append(title)
+        if author is not None:
+            set_clauses.append("author = %s")
+            params.append(author)
+        if edition is not None:
+            set_clauses.append("edition = %s")
+            params.append(edition)
+        if publication_year is not None:
+            set_clauses.append("publication_year = %s")
+            params.append(publication_year)
+
+        if not set_clauses:
+            return
+
+        params.append(str(document_id))
         with self.conn.cursor() as cur:
-            cur.execute("""
-                UPDATE documents
-                SET title = %s, author = %s, edition = %s, publication_year = %s
-                WHERE id = %s
-            """, (title, author, edition, publication_year, str(document_id)))
+            cur.execute(
+                f"UPDATE documents SET {', '.join(set_clauses)} WHERE id = %s",
+                params,
+            )
         self.conn.commit()
 
     def truncate_tables(self) -> None:

@@ -255,6 +255,11 @@ def concept_aware_chunking(
     4. Larger max_chunk_size (2500) for architecture concepts.
     5. Track section hierarchy in chunk metadata.
 
+    The default max_chunk_size of 2500 chars is sized for LLMs with large context
+    windows (e.g. Claude with 200K tokens). With top_k=5 retrieval, this yields
+    ~12,500 chars of context, leaving ample room for system prompts, user queries,
+    and response generation. Adjust downward if targeting smaller context windows.
+
     Args:
         doc: ParsedDocument with enriched TextBlock fields.
         max_chunk_size: Maximum characters per chunk.
@@ -267,13 +272,24 @@ def concept_aware_chunking(
 
     # heading_stack[level] = title, e.g. {1: "Chapter 5", 2: "5.3 CQRS"}
     heading_stack: dict[int, str] = {}
+    # Cache for the hierarchy string, invalidated when heading_stack changes
+    _hierarchy_cache: str | None = None
 
     def _current_hierarchy() -> str:
+        nonlocal _hierarchy_cache
+        if _hierarchy_cache is not None:
+            return _hierarchy_cache
         if not heading_stack:
-            return ""
-        return " > ".join(
-            heading_stack[k] for k in sorted(heading_stack.keys())
-        )
+            _hierarchy_cache = ""
+        else:
+            _hierarchy_cache = " > ".join(
+                heading_stack[k] for k in sorted(heading_stack.keys())
+            )
+        return _hierarchy_cache
+
+    def _invalidate_hierarchy_cache() -> None:
+        nonlocal _hierarchy_cache
+        _hierarchy_cache = None
 
     def _flush_acc(acc: _ChunkAccumulator) -> None:
         nonlocal position
@@ -307,10 +323,11 @@ def concept_aware_chunking(
                 heading_text = toc_title or block.text.strip()
 
                 # Truncate stack: remove all levels >= current
-                heading_stack = {
-                    k: v for k, v in heading_stack.items() if k < level
-                }
+                keys_to_remove = [k for k in heading_stack if k >= level]
+                for k in keys_to_remove:
+                    del heading_stack[k]
                 heading_stack[level] = heading_text
+                _invalidate_hierarchy_cache()
 
                 acc.section_hierarchy = _current_hierarchy()
                 acc.page_number = page.page_number

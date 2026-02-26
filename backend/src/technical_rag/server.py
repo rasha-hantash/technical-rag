@@ -213,7 +213,7 @@ def ingest_batch(
     title: str | None = Form(None),
     author: str | None = Form(None),
     edition: str | None = Form(None),
-    publication_year: int | None = Form(None),
+    publication_year: int | None = Form(None, ge=1900, le=2030),
     pipeline: RAGIngestionPipeline = Depends(get_ingestion_pipeline),
 ):
     """Ingest multiple PDF files via batch upload."""
