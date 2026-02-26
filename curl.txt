@@ -1,0 +1,32 @@
+  1. Programming Rust 2nd Edition
+  curl -X POST http://localhost:8000/api/v1/rag/ingest/batch \
+    -F "files=@docs/4_Programming Rust 2nd Edition.pdf" \
+    -F "title=Programming Rust" \
+    -F "author=Jim Blandy, Jason Orendorff, and Leonora Tindall" \
+    -F "edition=2nd" \
+    -F "publication_year=2021"
+
+  2. The Rust Programming Language
+  curl -X POST http://localhost:8000/api/v1/rag/ingest/batch \
+    -F "files=@docs/1_The.Rust.Programming.Language.pdf" \
+    -F "title=The Rust Programming Language" \
+    -F "author=Steve Klabnik and Carol Nichols" \
+    -F "publication_year=2023"
+
+  3. The Secrets of Rust - Tools
+  curl -X POST http://localhost:8000/api/v1/rag/ingest/batch \
+    -F "files=@docs/The+Secrets+of+Rust+-+Tools+(ToC).pdf" \
+    -F "title=The Secrets of Rust - Tools" \
+    -F "author=Unknown" \
+    -F "publication_year=2024"
+
+  5. Programming TypeScript
+  curl -X POST http://localhost:8000/api/v1/rag/ingest/batch \
+    -F "files=@docs/Boris Cherny - Programming TypeScript_ Making Your JavaScript Applications Scale
+   - O′Reilly (2019).pdf" \
+    -F "title=Programming TypeScript" \
+    -F "author=Boris Cherny" \
+    -F "publication_year=2019"
+
+  Note: I guessed the author/year for "The Secrets of Rust" — update those if you know the actual
+  values. Run these from the technical-rag/ root directory.
