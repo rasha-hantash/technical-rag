@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from psycopg2.extras import RealDictCursor
 from pydantic import BaseModel, Field
@@ -25,8 +25,8 @@ from .rag import (
     RAGRetriever,
 )
 
-# Maximum file size for uploads (50MB)
-MAX_UPLOAD_SIZE = 50 * 1024 * 1024
+# Maximum file size for uploads (200MB for large technical books)
+MAX_UPLOAD_SIZE = 200 * 1024 * 1024
 
 # Maximum number of files in a single batch upload
 MAX_BATCH_SIZE = 100
@@ -51,6 +51,10 @@ class SourceResponse(BaseModel):
     content: str
     content_preview: str
     bbox: list[float] | None = None
+    section_hierarchy: str | None = None
+    book_title: str | None = None
+    book_author: str | None = None
+    publication_year: int | None = None
 
 
 class QueryResponse(BaseModel):
@@ -206,6 +210,10 @@ def ready(db: PgVectorStore = Depends(get_db)):
 @app.post("/api/v1/rag/ingest/batch", response_model=BatchIngestResponse)
 def ingest_batch(
     files: list[UploadFile] = File(...),
+    title: str | None = Form(None),
+    author: str | None = Form(None),
+    edition: str | None = Form(None),
+    publication_year: int | None = Form(None),
     pipeline: RAGIngestionPipeline = Depends(get_ingestion_pipeline),
 ):
     """Ingest multiple PDF files via batch upload."""
@@ -270,6 +278,10 @@ def ingest_batch(
                 file_paths=valid_tmp_paths,
                 original_filenames=valid_filenames,
                 file_sizes=valid_file_sizes,
+                title=title,
+                author=author,
+                edition=edition,
+                publication_year=publication_year,
             )
 
             for i, result in enumerate(ingest_results):
@@ -335,6 +347,10 @@ def query(
                 content=s.content,
                 content_preview=s.content_preview,
                 bbox=s.bbox,
+                section_hierarchy=s.section_hierarchy,
+                book_title=s.book_title,
+                book_author=s.book_author,
+                publication_year=s.publication_year,
             )
             for s in response.sources
         ],
@@ -351,6 +367,10 @@ class DocumentResponse(BaseModel):
     chunks_count: int
     status: str
     file_size: int | None = None
+    title: str | None = None
+    author: str | None = None
+    edition: str | None = None
+    publication_year: int | None = None
     created_at: str
 
 
@@ -359,7 +379,8 @@ def list_documents(db: PgVectorStore = Depends(get_db)):
     """List all ingested documents with chunk counts."""
     with db.conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute(
-            """SELECT d.id, d.file_path, d.status, d.file_size, d.created_at,
+            """SELECT d.id, d.file_path, d.status, d.file_size, d.title, d.author,
+                      d.edition, d.publication_year, d.created_at,
                       COUNT(c.id) AS chunks_count
                FROM documents d
                LEFT JOIN chunks c ON c.document_id = d.id
@@ -375,6 +396,10 @@ def list_documents(db: PgVectorStore = Depends(get_db)):
             chunks_count=row["chunks_count"],
             status=row["status"],
             file_size=row["file_size"],
+            title=row.get("title"),
+            author=row.get("author"),
+            edition=row.get("edition"),
+            publication_year=row.get("publication_year"),
             created_at=row["created_at"].isoformat(),
         )
         for row in rows
@@ -392,3 +417,76 @@ def get_document_file(document_id: UUID):
         media_type="application/pdf",
         filename=f"{document_id}.pdf",
     )
+
+
+class BookMetadataRequest(BaseModel):
+    title: str | None = None
+    author: str | None = None
+    edition: str | None = None
+    publication_year: int | None = Field(default=None, ge=1900, le=2030)
+
+
+class BookSectionResponse(BaseModel):
+    section_hierarchy: str
+    chunk_count: int
+    start_page: int | None
+
+
+@app.put("/api/v1/documents/{document_id}/metadata", response_model=DocumentResponse)
+def update_document_metadata(
+    document_id: UUID,
+    body: BookMetadataRequest,
+    db: PgVectorStore = Depends(get_db),
+):
+    """Update book metadata for a document."""
+    db.update_book_metadata(
+        document_id=document_id,
+        title=body.title,
+        author=body.author,
+        edition=body.edition,
+        publication_year=body.publication_year,
+    )
+    # Re-fetch to return updated document
+    with db.conn.cursor(cursor_factory=RealDictCursor) as cur:
+        cur.execute(
+            """SELECT d.id, d.file_path, d.status, d.file_size, d.title, d.author,
+                      d.edition, d.publication_year, d.created_at,
+                      COUNT(c.id) AS chunks_count
+               FROM documents d
+               LEFT JOIN chunks c ON c.document_id = d.id
+               WHERE d.id = %s
+               GROUP BY d.id""",
+            (str(document_id),),
+        )
+        row = cur.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return DocumentResponse(
+        id=row["id"],
+        file_path=row["file_path"],
+        chunks_count=row["chunks_count"],
+        status=row["status"],
+        file_size=row["file_size"],
+        title=row.get("title"),
+        author=row.get("author"),
+        edition=row.get("edition"),
+        publication_year=row.get("publication_year"),
+        created_at=row["created_at"].isoformat(),
+    )
+
+
+@app.get("/api/v1/documents/{document_id}/sections", response_model=list[BookSectionResponse])
+def get_document_sections(
+    document_id: UUID,
+    db: PgVectorStore = Depends(get_db),
+):
+    """Get the chapter/section structure of a book."""
+    rows = db.get_book_sections(document_id)
+    return [
+        BookSectionResponse(
+            section_hierarchy=row["section_hierarchy"],
+            chunk_count=row["chunk_count"],
+            start_page=row.get("start_page"),
+        )
+        for row in rows
+    ]
