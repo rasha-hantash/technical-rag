@@ -1,38 +1,34 @@
-import { useState, useRef } from 'react'
-import type { DocumentResponse } from '../lib/types'
+import { useState, useRef } from "react";
+import type { DocumentResponse } from "../lib/types";
 
 interface DocumentListProps {
-  documents: DocumentResponse[]
-  isUploading: boolean
-  uploadingFileName: string | null
-  error: string | null
-  onClearError: () => void
-  onFilesSelected: (files: FileList) => void
+  documents: DocumentResponse[];
+  isUploading: boolean;
+  uploadingFileName: string | null;
+  error: string | null;
+  onClearError: () => void;
+  onFilesSelected: (files: FileList) => void;
 }
 
 function formatFileSize(bytes: number | null): string {
-  if (bytes === null || bytes === undefined) return ''
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  if (bytes === null || bytes === undefined) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function StatusBadge({ status }: { status: DocumentResponse['status'] }) {
+function StatusBadge({ status }: { status: DocumentResponse["status"] }) {
   switch (status) {
-    case 'processed':
+    case "processed":
       return (
         <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
           Processed
         </span>
-      )
-    case 'processing':
+      );
+    case "processing":
       return (
         <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
-          <svg
-            className="h-3 w-3 animate-spin"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
+          <svg className="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24">
             <circle
               className="opacity-25"
               cx="12"
@@ -49,13 +45,13 @@ function StatusBadge({ status }: { status: DocumentResponse['status'] }) {
           </svg>
           Processing
         </span>
-      )
-    case 'error':
+      );
+    case "error":
       return (
         <span className="inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">
           Error
         </span>
-      )
+      );
   }
 }
 
@@ -67,43 +63,45 @@ export function DocumentList({
   onClearError,
   onFilesSelected,
 }: DocumentListProps) {
-  const [collapsed, setCollapsed] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const folderInputRef = useRef<HTMLInputElement>(null)
+  const [collapsed, setCollapsed] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
 
   const handleClick = () => {
-    fileInputRef.current?.click()
-  }
+    fileInputRef.current?.click();
+  };
 
   const handleFolderClick = () => {
-    folderInputRef.current?.click()
-  }
+    folderInputRef.current?.click();
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      onFilesSelected(e.target.files)
-      e.target.value = ''
+      onFilesSelected(e.target.files);
+      e.target.value = "";
     }
-  }
+  };
 
   const handleFolderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const pdfFiles = Array.from(e.target.files).filter((f) =>
-        f.name.toLowerCase().endsWith('.pdf'),
-      )
+        f.name.toLowerCase().endsWith(".pdf"),
+      );
       if (pdfFiles.length > 0) {
-        const dt = new DataTransfer()
+        const dt = new DataTransfer();
         for (const file of pdfFiles) {
-          dt.items.add(file)
+          dt.items.add(file);
         }
-        onFilesSelected(dt.files)
+        onFilesSelected(dt.files);
       }
-      e.target.value = ''
+      e.target.value = "";
     }
-  }
+  };
 
-  const processedCount = documents.filter((d) => d.status === 'processed').length
-  const totalChunks = documents.reduce((sum, d) => sum + d.chunks_count, 0)
+  const processedCount = documents.filter(
+    (d) => d.status === "processed",
+  ).length;
+  const totalChunks = documents.reduce((sum, d) => sum + d.chunks_count, 0);
 
   return (
     <div className="border-b border-border-warm bg-warm-white">
@@ -120,7 +118,10 @@ export function DocumentList({
         type="file"
         className="hidden"
         onChange={handleFolderChange}
-        {...({ webkitdirectory: '', directory: '' } as React.InputHTMLAttributes<HTMLInputElement>)}
+        {...({
+          webkitdirectory: "",
+          directory: "",
+        } as React.InputHTMLAttributes<HTMLInputElement>)}
       />
 
       {documents.length === 0 && !isUploading ? (
@@ -178,7 +179,7 @@ export function DocumentList({
               className="flex items-center gap-2 text-sm text-stone-700 hover:text-stone-900 transition-colors"
             >
               <svg
-                className={`h-4 w-4 transition-transform ${collapsed ? '' : 'rotate-90'}`}
+                className={`h-4 w-4 transition-transform ${collapsed ? "" : "rotate-90"}`}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -204,11 +205,11 @@ export function DocumentList({
                 />
               </svg>
               <span>
-                {documents.length} {documents.length === 1 ? 'file' : 'files'}
-                {' · '}
+                {documents.length} {documents.length === 1 ? "file" : "files"}
+                {" · "}
                 {processedCount} processed
-                {' · '}
-                {totalChunks} {totalChunks === 1 ? 'chunk' : 'chunks'}
+                {" · "}
+                {totalChunks} {totalChunks === 1 ? "chunk" : "chunks"}
               </span>
             </button>
 
@@ -301,16 +302,28 @@ export function DocumentList({
                       d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                     />
                   </svg>
-                  <span className="flex-1 truncate text-stone-700">
-                    {doc.file_path.split('/').pop() || doc.file_path}
-                  </span>
+                  <div className="flex-1 min-w-0">
+                    <span className="truncate text-stone-700 block">
+                      {doc.title ||
+                        doc.file_path.split("/").pop() ||
+                        doc.file_path}
+                    </span>
+                    {(doc.author || doc.publication_year) && (
+                      <span className="text-xs text-stone-400 truncate block">
+                        {doc.author}
+                        {doc.author && doc.publication_year ? " · " : ""}
+                        {doc.publication_year}
+                      </span>
+                    )}
+                  </div>
                   {doc.file_size !== null && (
                     <span className="text-xs text-stone-400 flex-shrink-0">
                       {formatFileSize(doc.file_size)}
                     </span>
                   )}
                   <span className="text-xs text-stone-400 flex-shrink-0">
-                    {doc.chunks_count} {doc.chunks_count === 1 ? 'chunk' : 'chunks'}
+                    {doc.chunks_count}{" "}
+                    {doc.chunks_count === 1 ? "chunk" : "chunks"}
                   </span>
                   <StatusBadge status={doc.status} />
                 </div>
@@ -323,11 +336,14 @@ export function DocumentList({
       {error && (
         <div className="px-4 py-2 flex items-center gap-2 text-xs text-red-600 border-t border-border-warm">
           <span>{error}</span>
-          <button onClick={onClearError} className="underline hover:no-underline">
+          <button
+            onClick={onClearError}
+            className="underline hover:no-underline"
+          >
             dismiss
           </button>
         </div>
       )}
     </div>
-  )
+  );
 }
