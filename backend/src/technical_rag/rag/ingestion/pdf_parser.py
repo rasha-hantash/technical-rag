@@ -1,5 +1,6 @@
 """PDF parsing module using PyMuPDF for text and structure extraction."""
 
+import re
 import statistics
 from pathlib import Path
 
@@ -11,6 +12,39 @@ from .parser_models import ParsedDocument, ParsedPage, TableData, TextBlock
 
 # Threshold for detecting garbage text (corrupted font encodings)
 GARBAGE_CONTROL_CHAR_RATIO = 0.1  # >10% control chars = garbage
+
+_CALLOUT_PATTERNS = {
+    "tip": re.compile(r"^(tip|hint)\s*[:\-]", re.IGNORECASE),
+    "warning": re.compile(r"^(warning|caution|danger)\s*[:\-]", re.IGNORECASE),
+    "note": re.compile(r"^(note|info|information)\s*[:\-]", re.IGNORECASE),
+    "best_practice": re.compile(r"^(best practice|recommended|guideline)\s*[:\-]", re.IGNORECASE),
+    "definition": re.compile(r"^(definition|def)\s*[:\-]", re.IGNORECASE),
+}
+
+_MONOSPACE_FONTS = ("courier", "mono", "consolas", "menlo", "source code", "fira code", "inconsolata", "dejavu sans mono", "liberation mono")
+
+
+def _detect_callout(text: str) -> str | None:
+    """Return callout type if text matches a callout pattern, else None."""
+    stripped = text.strip()
+    for callout_type, pattern in _CALLOUT_PATTERNS.items():
+        if pattern.match(stripped):
+            return callout_type
+    return None
+
+
+def _extract_toc(doc: fitz.Document) -> dict[int, list[tuple[int, str]]]:
+    """Extract TOC bookmarks from a PDF document.
+
+    Returns a dict mapping page numbers (1-indexed) to lists of (level, title) tuples.
+    """
+    toc = doc.get_toc()  # [[level, title, page], ...]
+    result: dict[int, list[tuple[int, str]]] = {}
+    for level, title, page in toc:
+        if page not in result:
+            result[page] = []
+        result[page].append((level, title.strip()))
+    return result
 
 
 def _is_garbage_text(text: str) -> bool:
@@ -31,18 +65,19 @@ def _is_garbage_text(text: str) -> bool:
 
 
 
-def _extract_spans_info(block_dict: dict) -> tuple[str, float, bool]:
-    """Extract text, font size, and bold status from a block's spans.
+def _extract_spans_info(block_dict: dict) -> tuple[str, float, bool, bool]:
+    """Extract text, font size, bold status, and monospace status from a block's spans.
 
     Args:
         block_dict: A block dictionary from PyMuPDF's get_text("dict").
 
     Returns:
-        Tuple of (text, average_font_size, is_bold).
+        Tuple of (text, average_font_size, is_bold, is_monospace).
     """
     texts = []
     font_sizes = []
     bold_count = 0
+    monospace_count = 0
     total_spans = 0
 
     for line in block_dict.get("lines", []):
@@ -57,9 +92,11 @@ def _extract_spans_info(block_dict: dict) -> tuple[str, float, bool]:
                 font_name = span.get("font", "").lower()
                 if (flags & 2**4) or "bold" in font_name:
                     bold_count += 1
+                if any(mono in font_name for mono in _MONOSPACE_FONTS):
+                    monospace_count += 1
 
     if not texts:
-        return "", 12.0, False
+        return "", 12.0, False, False
 
     combined_text = " ".join(texts)
     # Remove NUL characters that can occur with corrupted font encodings
@@ -67,13 +104,14 @@ def _extract_spans_info(block_dict: dict) -> tuple[str, float, bool]:
     combined_text = combined_text.replace("\x00", "")
     avg_font_size = statistics.mean(font_sizes) if font_sizes else 12.0
     is_bold = bold_count > total_spans / 2 if total_spans > 0 else False
+    is_monospace = monospace_count > total_spans / 2 if total_spans > 0 else False
 
-    return combined_text, avg_font_size, is_bold
+    return combined_text, avg_font_size, is_bold, is_monospace
 
 
 def _classify_block(
-    text: str, font_size: float, median_size: float, is_bold: bool
-) -> str:
+    text: str, font_size: float, median_size: float, is_bold: bool, is_monospace: bool
+) -> tuple[str, int | None]:
     """Classify a text block based on its properties.
 
     Args:
@@ -81,25 +119,32 @@ def _classify_block(
         font_size: Average font size of the block.
         median_size: Median font size across the document.
         is_bold: Whether the block is predominantly bold.
+        is_monospace: Whether the block is predominantly monospace.
 
     Returns:
-        Block type: "heading", "list_item", or "paragraph".
+        Tuple of (block_type, heading_level).
     """
+    # Code blocks: monospace font with sufficient length
+    if is_monospace and len(text) > 20:
+        return "code_block", None
+
     # Check for list items
     stripped = text.strip()
     if stripped and (
         stripped[0] in "•◦▪▸►-*"
         or (len(stripped) > 2 and stripped[0].isdigit() and stripped[1] in ".)")
     ):
-        return "list_item"
+        return "list_item", None
 
     # Headings: larger font or bold with short text
+    if font_size > median_size * 1.5:
+        return "heading", 1
     if font_size > median_size * 1.2:
-        return "heading"
+        return "heading", 2
     if is_bold and len(text) < 100:
-        return "heading"
+        return "heading", 3
 
-    return "paragraph"
+    return "paragraph", None
 
 
 def parse_pdf_pymupdf(file_path: str | Path) -> ParsedDocument:
@@ -125,11 +170,15 @@ def parse_pdf_pymupdf(file_path: str | Path) -> ParsedDocument:
             page_dict = page.get_text("dict")
             for block in page_dict.get("blocks", []):
                 if block.get("type") == 0:  # Text block
-                    _, font_size, _ = _extract_spans_info(block)
+                    _, font_size, _, _ = _extract_spans_info(block)
                     if font_size > 0:
                         all_font_sizes.append(font_size)
 
         median_size = statistics.median(all_font_sizes) if all_font_sizes else 12.0
+
+        toc = _extract_toc(doc)
+        if toc:
+            logger.info("toc extracted", toc_entries=sum(len(v) for v in toc.values()))
 
         # Second pass: extract and classify blocks
         parsed_pages = []
@@ -142,7 +191,7 @@ def parse_pdf_pymupdf(file_path: str | Path) -> ParsedDocument:
             page_texts = []
             for block in page_dict.get("blocks", []):
                 if block.get("type") == 0:
-                    text, _, _ = _extract_spans_info(block)
+                    text, _, _, _ = _extract_spans_info(block)
                     if text.strip():
                         page_texts.append(text)
 
@@ -175,7 +224,7 @@ def parse_pdf_pymupdf(file_path: str | Path) -> ParsedDocument:
                     if block.get("type") != 0:  # Skip non-text blocks (images, etc.)
                         continue
 
-                    text, font_size, is_bold = _extract_spans_info(block)
+                    text, font_size, is_bold, is_monospace = _extract_spans_info(block)
                     if not text.strip():
                         continue
 
@@ -188,7 +237,11 @@ def parse_pdf_pymupdf(file_path: str | Path) -> ParsedDocument:
                             block_index=block_idx,
                         )
 
-                    block_type = _classify_block(text, font_size, median_size, is_bold)
+                    block_type, heading_level = _classify_block(text, font_size, median_size, is_bold, is_monospace)
+
+                    callout_type = _detect_callout(text)
+                    if callout_type and block_type == "paragraph":
+                        block_type = "callout"
 
                     blocks.append(
                         TextBlock(
@@ -197,7 +250,10 @@ def parse_pdf_pymupdf(file_path: str | Path) -> ParsedDocument:
                             text=text,
                             font_size=font_size,
                             is_bold=is_bold,
+                            is_monospace=is_monospace,
                             bbox=list(bbox) if bbox else None,
+                            heading_level=heading_level,
+                            callout_type=callout_type,
                         )
                     )
 
@@ -251,6 +307,7 @@ def parse_pdf_pymupdf(file_path: str | Path) -> ParsedDocument:
             file_path=str(file_path),
             total_pages=len(parsed_pages),
             pages=parsed_pages,
+            toc=toc,
         )
     finally:
         doc.close()

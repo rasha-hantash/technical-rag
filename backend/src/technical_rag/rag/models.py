@@ -13,6 +13,10 @@ class IngestedDocument(BaseModel):
     metadata: dict = Field(default_factory=dict)
     status: str = "processing"
     file_size: int | None = None
+    title: str | None = None
+    author: str | None = None
+    edition: str | None = None
+    publication_year: int | None = None
     created_at: datetime
 
 
@@ -25,6 +29,7 @@ class ChunkRecord(BaseModel):
     position: int | None = None
     embedding: list[float] | None = None
     bbox: list[float] | None = None  # [x0, y0, x1, y1] coordinates
+    section_hierarchy: str | None = None
     created_at: datetime | None = None
 
     @field_validator("bbox")
@@ -54,6 +59,7 @@ class ChunkData(BaseModel):
     position: int
     bbox: list[float] | None = None
     block_bboxes: list[list[float]] | None = None
+    section_hierarchy: str | None = None
     embedding: list[float] | None = None
 
 
