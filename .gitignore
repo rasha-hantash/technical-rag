@@ -27,6 +27,7 @@ docs/*.pdf
 .mcp.json
 
 # Frontend
+frontend/package-lock.json
 frontend/node_modules/
 frontend/.vinxi/
 frontend/.output/

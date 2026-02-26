@@ -6,7 +6,8 @@ ALTER TABLE chunks ADD COLUMN section_hierarchy TEXT;
 ALTER TABLE chunks DROP COLUMN IF EXISTS embedding;
 ALTER TABLE chunks ADD COLUMN embedding vector(3072);
 
--- Rebuild vector index for new 3072-dimension embeddings.
--- Drop old index (if any) and create HNSW index for cosine similarity.
+-- pgvector HNSW/IVFFlat indexes max out at 2000 dimensions (8KB page limit).
+-- For 3072-dimension embeddings, skip the index — exact brute-force search is
+-- fast enough for <50k chunks (~20 books). For larger datasets, add a halfvec-based
+-- index later: CREATE INDEX ... USING hnsw ((embedding::halfvec(3072)) halfvec_cosine_ops);
 DROP INDEX IF EXISTS chunks_embedding_idx;
-CREATE INDEX chunks_embedding_idx ON chunks USING hnsw (embedding vector_cosine_ops);
