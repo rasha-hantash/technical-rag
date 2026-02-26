@@ -31,3 +31,4 @@ frontend/.output/
 frontend/dist/
 frontend/test-results/
 frontend/playwright-report/
+.mesa/history/
