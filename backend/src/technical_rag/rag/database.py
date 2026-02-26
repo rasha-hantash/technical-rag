@@ -80,6 +80,10 @@ class PgVectorStore:
         file_path: str,
         metadata: dict | None = None,
         file_size: int | None = None,
+        title: str | None = None,
+        author: str | None = None,
+        edition: str | None = None,
+        publication_year: int | None = None,
     ) -> IngestedDocument:
         metadata = metadata or {}
         start = time.perf_counter()
@@ -87,11 +91,11 @@ class PgVectorStore:
             with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
                     """
-                    INSERT INTO documents (file_hash, file_path, metadata, file_size)
-                    VALUES (%s, %s, %s, %s)
-                    RETURNING id, file_hash, file_path, metadata, status, file_size, created_at
+                    INSERT INTO documents (file_hash, file_path, metadata, file_size, title, author, edition, publication_year)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id, file_hash, file_path, metadata, status, file_size, title, author, edition, publication_year, created_at
                     """,
-                    (file_hash, file_path, Json(metadata), file_size),
+                    (file_hash, file_path, Json(metadata), file_size, title, author, edition, publication_year),
                 )
                 row = cur.fetchone()
             self.conn.commit()
@@ -127,15 +131,16 @@ class PgVectorStore:
                         chunk.position,
                         chunk.embedding,
                         Json(chunk.bbox) if chunk.bbox else None,
+                        chunk.section_hierarchy,
                     )
                     for chunk in chunks
                 ]
                 inserted_rows = execute_values(
                     cur,
                     """
-                    INSERT INTO chunks (document_id, content, chunk_type, page_number, position, embedding, bbox)
+                    INSERT INTO chunks (document_id, content, chunk_type, page_number, position, embedding, bbox, section_hierarchy)
                     VALUES %s
-                    RETURNING id, document_id, content, chunk_type, page_number, position, embedding, bbox, created_at
+                    RETURNING id, document_id, content, chunk_type, page_number, position, embedding, bbox, section_hierarchy, created_at
                     """,
                     values,
                     fetch=True,
@@ -172,8 +177,9 @@ class PgVectorStore:
                 """
                 SELECT
                     c.id, c.document_id, c.content, c.chunk_type, c.page_number,
-                    c.position, c.embedding, c.bbox, c.created_at,
-                    d.id as doc_id, d.file_hash, d.file_path, d.metadata, d.status, d.file_size, d.created_at as doc_created_at,
+                    c.position, c.embedding, c.bbox, c.section_hierarchy, c.created_at,
+                    d.id as doc_id, d.file_hash, d.file_path, d.metadata, d.status, d.file_size,
+                    d.title, d.author, d.edition, d.publication_year, d.created_at as doc_created_at,
                     1 - (c.embedding <=> %s::vector) as score
                 FROM chunks c
                 JOIN documents d ON c.document_id = d.id
@@ -216,8 +222,9 @@ class PgVectorStore:
                 """
                 SELECT
                     c.id, c.document_id, c.content, c.chunk_type, c.page_number,
-                    c.position, c.embedding, c.bbox, c.created_at,
-                    d.id as doc_id, d.file_hash, d.file_path, d.metadata, d.status, d.file_size, d.created_at as doc_created_at,
+                    c.position, c.embedding, c.bbox, c.section_hierarchy, c.created_at,
+                    d.id as doc_id, d.file_hash, d.file_path, d.metadata, d.status, d.file_size,
+                    d.title, d.author, d.edition, d.publication_year, d.created_at as doc_created_at,
                     ts_rank(c.search_vector, plainto_tsquery('english', %s)) as score
                 FROM chunks c
                 JOIN documents d ON c.document_id = d.id
@@ -322,6 +329,7 @@ class PgVectorStore:
                 position=row["position"],
                 embedding=row["embedding"],
                 bbox=row.get("bbox"),
+                section_hierarchy=row.get("section_hierarchy"),
                 created_at=row["created_at"],
             )
             document = IngestedDocument(
@@ -331,6 +339,10 @@ class PgVectorStore:
                 metadata=row["metadata"],
                 status=row["status"],
                 file_size=row["file_size"],
+                title=row.get("title"),
+                author=row.get("author"),
+                edition=row.get("edition"),
+                publication_year=row.get("publication_year"),
                 created_at=row["doc_created_at"],
             )
             results.append(SearchResult(chunk=chunk, score=row["score"], document=document))
@@ -339,7 +351,7 @@ class PgVectorStore:
     def get_documents(self) -> list[IngestedDocument]:
         with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
-                "SELECT id, file_hash, file_path, metadata, status, file_size, created_at FROM documents ORDER BY created_at DESC"
+                "SELECT id, file_hash, file_path, metadata, status, file_size, title, author, edition, publication_year, created_at FROM documents ORDER BY created_at DESC"
             )
             rows = cur.fetchall()
         return [IngestedDocument(**row) for row in rows]
@@ -347,7 +359,7 @@ class PgVectorStore:
     def get_document_by_hash(self, file_hash: str) -> IngestedDocument | None:
         with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
-                "SELECT id, file_hash, file_path, metadata, status, file_size, created_at FROM documents WHERE file_hash = %s",
+                "SELECT id, file_hash, file_path, metadata, status, file_size, title, author, edition, publication_year, created_at FROM documents WHERE file_hash = %s",
                 (file_hash,),
             )
             row = cur.fetchone()
@@ -360,6 +372,10 @@ class PgVectorStore:
         chunks: list[ChunkData],
         metadata: dict | None = None,
         file_size: int | None = None,
+        title: str | None = None,
+        author: str | None = None,
+        edition: str | None = None,
+        publication_year: int | None = None,
     ) -> tuple[IngestedDocument, list[ChunkRecord]]:
         """Insert a document and its chunks atomically in a single transaction.
 
@@ -369,6 +385,10 @@ class PgVectorStore:
             chunks: List of ChunkData objects from the chunking module.
             metadata: Optional metadata to attach to the document.
             file_size: Optional file size in bytes.
+            title: Optional book title.
+            author: Optional book author.
+            edition: Optional book edition.
+            publication_year: Optional publication year.
 
         Returns:
             Tuple of (IngestedDocument, list of inserted ChunkRecords).
@@ -382,11 +402,11 @@ class PgVectorStore:
                 # Insert document
                 cur.execute(
                     """
-                    INSERT INTO documents (file_hash, file_path, metadata, status, file_size)
-                    VALUES (%s, %s, %s, 'processed', %s)
-                    RETURNING id, file_hash, file_path, metadata, status, file_size, created_at
+                    INSERT INTO documents (file_hash, file_path, metadata, status, file_size, title, author, edition, publication_year)
+                    VALUES (%s, %s, %s, 'processed', %s, %s, %s, %s, %s)
+                    RETURNING id, file_hash, file_path, metadata, status, file_size, title, author, edition, publication_year, created_at
                     """,
-                    (file_hash, file_path, Json(metadata), file_size),
+                    (file_hash, file_path, Json(metadata), file_size, title, author, edition, publication_year),
                 )
                 doc_row = cur.fetchone()
                 doc = IngestedDocument(**doc_row)
@@ -403,15 +423,16 @@ class PgVectorStore:
                             chunk.position,
                             chunk.embedding,
                             Json(chunk.bbox) if chunk.bbox else None,
+                            chunk.section_hierarchy,
                         )
                         for chunk in chunks
                     ]
                     inserted_rows = execute_values(
                         cur,
                         """
-                        INSERT INTO chunks (document_id, content, chunk_type, page_number, position, embedding, bbox)
+                        INSERT INTO chunks (document_id, content, chunk_type, page_number, position, embedding, bbox, section_hierarchy)
                         VALUES %s
-                        RETURNING id, document_id, content, chunk_type, page_number, position, embedding, bbox, created_at
+                        RETURNING id, document_id, content, chunk_type, page_number, position, embedding, bbox, section_hierarchy, created_at
                         """,
                         values,
                         fetch=True,
@@ -494,6 +515,32 @@ class PgVectorStore:
         except Exception:
             self.conn.rollback()
             raise
+
+    def get_book_sections(self, document_id) -> list[dict]:
+        """Get distinct section hierarchies and their chunk counts for a document."""
+        with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT section_hierarchy, COUNT(*) as chunk_count,
+                       MIN(page_number) as start_page
+                FROM chunks
+                WHERE document_id = %s AND section_hierarchy IS NOT NULL
+                GROUP BY section_hierarchy
+                ORDER BY MIN(position)
+            """, (str(document_id),))
+            return cur.fetchall()
+
+    def update_book_metadata(
+        self, document_id, title: str | None = None, author: str | None = None,
+        edition: str | None = None, publication_year: int | None = None,
+    ) -> None:
+        """Update book metadata for a document."""
+        with self.conn.cursor() as cur:
+            cur.execute("""
+                UPDATE documents
+                SET title = %s, author = %s, edition = %s, publication_year = %s
+                WHERE id = %s
+            """, (title, author, edition, publication_year, str(document_id)))
+        self.conn.commit()
 
     def truncate_tables(self) -> None:
         """Truncate all tables. Use only in tests for isolation between test runs."""

@@ -20,6 +20,10 @@ class SourceReference(BaseModel):
     content: str
     content_preview: str  # First 200 chars of chunk
     bbox: list[float] | None = None  # [x0, y0, x1, y1] coordinates
+    section_hierarchy: str | None = None
+    book_title: str | None = None
+    book_author: str | None = None
+    publication_year: int | None = None
 
 
 class RAGResponse(BaseModel):
@@ -33,14 +37,18 @@ class RAGResponse(BaseModel):
 class RAGGenerator:
     """Generates answers from retrieved search results using Claude."""
 
-    DEFAULT_SYSTEM_PROMPT = """You are a helpful assistant that answers questions based on the provided context.
+    DEFAULT_SYSTEM_PROMPT = """You are a technical architecture advisor that answers questions by referencing authoritative technical books.
 
 Rules:
-1. Only use information from the provided context to answer the question
-2. If the context doesn't contain enough information to answer, say so clearly
-3. Cite specific sources when possible (e.g., "According to page X...")
-4. Be concise and direct in your answers
-5. If the question is ambiguous, ask for clarification"""
+1. Only use information from the provided context to answer the question.
+2. Always cite your sources using this format: [BookTitle, Chapter/Section, p.XX]
+3. If multiple books discuss the same topic, compare their perspectives.
+4. If a source's publication year suggests its advice may be outdated, explicitly note this:
+   "Note: This advice is from [BookTitle] ([Year]). Practices in this area have evolved since then."
+5. When the user provides code, evaluate it against the principles from the books.
+   Be specific about which principle applies and why.
+6. If the context doesn't contain enough information, say so clearly.
+7. Be direct and technical in your responses."""
 
     def __init__(
         self,
@@ -129,17 +137,22 @@ Please answer the question based only on the provided context."""
             chunk = result.chunk
             doc = result.document
 
-            # Build source info
             source_info = []
             if doc:
-                source_info.append(f"Source: {doc.file_path}")
+                book_label = doc.title or doc.file_path
+                if doc.author:
+                    book_label += f" by {doc.author}"
+                if doc.publication_year:
+                    book_label += f" ({doc.publication_year})"
+                source_info.append(f"Book: {book_label}")
+            if chunk.section_hierarchy:
+                source_info.append(f"Section: {chunk.section_hierarchy}")
             if chunk.page_number is not None:
                 source_info.append(f"Page: {chunk.page_number}")
             if chunk.chunk_type:
                 source_info.append(f"Type: {chunk.chunk_type}")
 
             header = f"[Context {i}] " + " | ".join(source_info) if source_info else f"[Context {i}]"
-
             context_parts.append(f"{header}\n{chunk.content}")
 
         return "\n\n---\n\n".join(context_parts)
@@ -167,6 +180,10 @@ Please answer the question based only on the provided context."""
                     content=chunk.content,
                     content_preview=chunk.content[:200] + "..." if len(chunk.content) > 200 else chunk.content,
                     bbox=chunk.bbox,
+                    section_hierarchy=chunk.section_hierarchy,
+                    book_title=doc.title if doc else None,
+                    book_author=doc.author if doc else None,
+                    publication_year=doc.publication_year if doc else None,
                 )
             )
 

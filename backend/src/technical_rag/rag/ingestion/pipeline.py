@@ -90,10 +90,14 @@ def ingest_document(
     db: PgVectorStore,
     embedding_client: EmbeddingClient | None = None,
     metadata: dict | None = None,
-    chunking_strategy: str = "semantic",
+    chunking_strategy: str = "concept",
     allowed_dirs: list[Path] | None = None,
     original_filename: str | None = None,
     file_size: int | None = None,
+    title: str | None = None,
+    author: str | None = None,
+    edition: str | None = None,
+    publication_year: int | None = None,
 ) -> IngestResult:
     """Ingest a single PDF document into the RAG system.
 
@@ -161,6 +165,10 @@ def ingest_document(
             file_path=stored_path,
             metadata=metadata or {},
             file_size=file_size,
+            title=title,
+            author=author,
+            edition=edition,
+            publication_year=publication_year,
         )
 
         try:
@@ -214,6 +222,7 @@ def ingest_document(
                     position=chunk.position,
                     embedding=chunk.embedding,
                     bbox=chunk.bbox,
+                    section_hierarchy=chunk.section_hierarchy,
                 )
                 for chunk in chunk_data_list
             ]
@@ -255,7 +264,7 @@ class RAGIngestionPipeline:
         self,
         db: PgVectorStore,
         embedding_client: EmbeddingClient | None = None,
-        chunking_strategy: str = "semantic",
+        chunking_strategy: str = "concept",
         allowed_dirs: list[Path] | None = None,
     ):
         """Initialize the ingestion pipeline.
@@ -264,7 +273,7 @@ class RAGIngestionPipeline:
             db: PgVectorStore database connection.
             embedding_client: Optional EmbeddingClient for generating embeddings.
                 If None, chunks are stored without embeddings.
-            chunking_strategy: Default chunking strategy ("semantic" or "fixed").
+            chunking_strategy: Default chunking strategy ("concept", "semantic", or "fixed").
             allowed_dirs: Optional list of allowed directories for path validation.
                 If provided, all ingested files must be within these directories.
         """
@@ -281,6 +290,10 @@ class RAGIngestionPipeline:
         metadata: dict | None = None,
         original_filename: str | None = None,
         file_size: int | None = None,
+        title: str | None = None,
+        author: str | None = None,
+        edition: str | None = None,
+        publication_year: int | None = None,
     ) -> IngestResult:
         """Ingest a single document.
 
@@ -289,6 +302,10 @@ class RAGIngestionPipeline:
             metadata: Optional metadata to attach.
             original_filename: Optional original filename to store in the database.
             file_size: Optional file size in bytes.
+            title: Optional book title.
+            author: Optional book author.
+            edition: Optional book edition.
+            publication_year: Optional publication year.
 
         Returns:
             IngestResult with document info and chunk count.
@@ -302,6 +319,10 @@ class RAGIngestionPipeline:
             allowed_dirs=self.allowed_dirs,
             original_filename=original_filename,
             file_size=file_size,
+            title=title,
+            author=author,
+            edition=edition,
+            publication_year=publication_year,
         )
 
     def _ingest_worker(
@@ -310,6 +331,10 @@ class RAGIngestionPipeline:
         metadata: dict | None,
         original_filename: str | None = None,
         file_size: int | None = None,
+        title: str | None = None,
+        author: str | None = None,
+        edition: str | None = None,
+        publication_year: int | None = None,
     ) -> IngestResult:
         """Worker function for parallel ingestion with its own DB connection.
 
@@ -328,6 +353,10 @@ class RAGIngestionPipeline:
                 allowed_dirs=self.allowed_dirs,
                 original_filename=original_filename,
                 file_size=file_size,
+                title=title,
+                author=author,
+                edition=edition,
+                publication_year=publication_year,
             )
         finally:
             worker_db.disconnect()
@@ -339,6 +368,10 @@ class RAGIngestionPipeline:
         max_workers: int = 4,
         original_filenames: list[str] | None = None,
         file_sizes: list[int] | None = None,
+        title: str | None = None,
+        author: str | None = None,
+        edition: str | None = None,
+        publication_year: int | None = None,
     ) -> list[IngestResult]:
         """Ingest multiple documents in parallel.
 
@@ -348,6 +381,11 @@ class RAGIngestionPipeline:
             max_workers: Maximum number of parallel workers (default: 4).
                 Set to 1 for sequential processing.
             original_filenames: Optional list of original filenames, one per file_path.
+            file_sizes: Optional list of file sizes in bytes, one per file_path.
+            title: Optional book title for all documents.
+            author: Optional book author for all documents.
+            edition: Optional book edition for all documents.
+            publication_year: Optional publication year for all documents.
 
         Returns:
             List of IngestResult objects in the same order as input file_paths.
@@ -377,7 +415,16 @@ class RAGIngestionPipeline:
                 try:
                     fname = original_filenames[i] if original_filenames else None
                     fsize = file_sizes[i] if file_sizes else None
-                    result = self.ingest(file_path, metadata, original_filename=fname, file_size=fsize)
+                    result = self.ingest(
+                        file_path,
+                        metadata,
+                        original_filename=fname,
+                        file_size=fsize,
+                        title=title,
+                        author=author,
+                        edition=edition,
+                        publication_year=publication_year,
+                    )
                     results_dict[i] = result
                 except Exception as e:
                     logger.error(
@@ -405,6 +452,10 @@ class RAGIngestionPipeline:
                         metadata,
                         original_filenames[i] if original_filenames else None,
                         file_sizes[i] if file_sizes else None,
+                        title,
+                        author,
+                        edition,
+                        publication_year,
                     ): i
                     for i, fp in enumerate(file_paths)
                 }
