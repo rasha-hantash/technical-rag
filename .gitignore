@@ -19,10 +19,12 @@ docs/*.pdf
 .env
 .env.local
 
-# IDE / OS
+# IDE / OS / local tooling
 .DS_Store
 .idea/
 .vscode/
+.claude/
+.mcp.json
 
 # Frontend
 frontend/node_modules/
@@ -31,4 +33,7 @@ frontend/.output/
 frontend/dist/
 frontend/test-results/
 frontend/playwright-report/
-.mesa/history/
+.mesa/
+
+# Python lockfile
+backend/uv.lock
