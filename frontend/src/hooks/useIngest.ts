@@ -1,42 +1,44 @@
-import { useState, useCallback } from 'react'
-import { ingestBatch } from '../lib/api'
+import { useState, useCallback } from "react";
+import { ingestBatch } from "../lib/api";
+import type { BookMetadata } from "../lib/types";
 
 interface UseIngestReturn {
-  uploadFiles: (files: FileList) => Promise<void>
-  isUploading: boolean
-  uploadingFileName: string | null
-  error: string | null
-  clearError: () => void
+  uploadFiles: (
+    files: FileList,
+    metadata?: Partial<BookMetadata>,
+  ) => Promise<void>;
+  isUploading: boolean;
+  uploadingFileName: string | null;
+  error: string | null;
+  clearError: () => void;
 }
 
-export function useIngest(
-  onUploadComplete: () => void,
-): UseIngestReturn {
-  const [isUploading, setIsUploading] = useState(false)
+export function useIngest(onUploadComplete: () => void): UseIngestReturn {
+  const [isUploading, setIsUploading] = useState(false);
   const [uploadingFileName, setUploadingFileName] = useState<string | null>(
     null,
-  )
-  const [error, setError] = useState<string | null>(null)
+  );
+  const [error, setError] = useState<string | null>(null);
 
   const uploadFiles = useCallback(
-    async (files: FileList) => {
-      setIsUploading(true)
-      setError(null)
-      const errors: string[] = []
-      const fileArray = Array.from(files)
+    async (files: FileList, metadata?: Partial<BookMetadata>) => {
+      setIsUploading(true);
+      setError(null);
+      const errors: string[] = [];
+      const fileArray = Array.from(files);
 
       // Client-side validation
-      const validFiles: File[] = []
+      const validFiles: File[] = [];
       for (const file of fileArray) {
-        if (!file.name.toLowerCase().endsWith('.pdf')) {
-          errors.push(`${file.name} is not a PDF file`)
-          continue
+        if (!file.name.toLowerCase().endsWith(".pdf")) {
+          errors.push(`${file.name} is not a PDF file`);
+          continue;
         }
         if (file.size > 50 * 1024 * 1024) {
-          errors.push(`${file.name} exceeds 50MB limit`)
-          continue
+          errors.push(`${file.name} exceeds 50MB limit`);
+          continue;
         }
-        validFiles.push(file)
+        validFiles.push(file);
       }
 
       if (validFiles.length >= 1) {
@@ -44,33 +46,33 @@ export function useIngest(
           validFiles.length === 1
             ? validFiles[0].name
             : `Uploading ${validFiles.length} files...`,
-        )
+        );
         try {
-          const batchResult = await ingestBatch(validFiles)
+          const batchResult = await ingestBatch(validFiles, metadata);
           for (const item of batchResult.results) {
             if (item.error) {
-              errors.push(`${item.file_name}: ${item.error}`)
+              errors.push(`${item.file_name}: ${item.error}`);
             } else if (item.was_duplicate) {
-              errors.push(`${item.file_name} was already uploaded`)
+              errors.push(`${item.file_name} was already uploaded`);
             }
           }
-          onUploadComplete()
+          onUploadComplete();
         } catch (e) {
-          errors.push(e instanceof Error ? e.message : 'Upload failed')
+          errors.push(e instanceof Error ? e.message : "Upload failed");
         }
       }
 
       if (errors.length > 0) {
-        setError(errors.join('; '))
+        setError(errors.join("; "));
       }
 
-      setUploadingFileName(null)
-      setIsUploading(false)
+      setUploadingFileName(null);
+      setIsUploading(false);
     },
     [onUploadComplete],
-  )
+  );
 
-  const clearError = useCallback(() => setError(null), [])
+  const clearError = useCallback(() => setError(null), []);
 
-  return { uploadFiles, isUploading, uploadingFileName, error, clearError }
+  return { uploadFiles, isUploading, uploadingFileName, error, clearError };
 }

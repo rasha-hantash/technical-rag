@@ -7,7 +7,7 @@ on factual accuracy, completeness, key facts recall, and hallucination.
 import json
 from dataclasses import dataclass
 
-from pdf_llm_server.rag.llm_clients.anthropic_client import AnthropicClient
+from technical_rag.rag.llm_clients.anthropic_client import AnthropicClient
 
 _JUDGE_SYSTEM_PROMPT = """You are an evaluation judge for a RAG (Retrieval-Augmented Generation) system.
 You will be given a question, the expected answer with key facts, and the generated answer.

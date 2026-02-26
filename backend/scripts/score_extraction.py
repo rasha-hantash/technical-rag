@@ -4,7 +4,6 @@
 Usage:
     uv run python scripts/score_extraction.py <pdf_path> <ground_truth.json> [options]
 
-    --parser pymupdf|reducto    Parser to score (default: same as ground truth)
     --json                      Output as JSON instead of text table
 """
 
@@ -15,8 +14,7 @@ from pathlib import Path
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from pdf_llm_server.rag.ingestion.pdf_parser import parse_pdf_pymupdf
-from pdf_llm_server.rag.ingestion.reducto_parser import ReductoParser
+from technical_rag.rag.ingestion.pdf_parser import parse_pdf_pymupdf
 
 from eval.ground_truth import load_ground_truth
 from eval.scoring import score_extraction, format_report, format_report_json
@@ -29,12 +27,6 @@ def main() -> None:
     parser.add_argument("pdf_path", type=Path, help="Path to the PDF file to parse")
     parser.add_argument(
         "ground_truth_path", type=Path, help="Path to the ground truth JSON file"
-    )
-    parser.add_argument(
-        "--parser",
-        choices=["pymupdf", "reducto"],
-        default=None,
-        help="Parser to score (default: same as ground truth)",
     )
     parser.add_argument(
         "--json", action="store_true", dest="json_output", help="Output as JSON"
@@ -60,22 +52,11 @@ def main() -> None:
         print("Warning: ground truth has no annotated pages.", file=sys.stderr)
         sys.exit(0)
 
-    # Determine parser
-    parser_name = args.parser if args.parser else gt.parser_name
-
-    # Parse PDF with selected parser
-    if parser_name == "reducto":
-        try:
-            reducto = ReductoParser()
-        except (ValueError, ImportError) as e:
-            print(f"Error: {e}", file=sys.stderr)
-            sys.exit(1)
-        doc = reducto.parse(args.pdf_path)
-    else:
-        doc = parse_pdf_pymupdf(args.pdf_path)
+    # Parse PDF with PyMuPDF
+    doc = parse_pdf_pymupdf(args.pdf_path)
 
     # Score
-    report = score_extraction(gt, doc, parser_name)
+    report = score_extraction(gt, doc, "pymupdf")
 
     # Output
     if args.json_output:

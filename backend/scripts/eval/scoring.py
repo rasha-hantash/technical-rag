@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from .ground_truth import GroundTruth, PageAnnotation, Verdict
 
 # Imports needed only for type hints from parser models
-from pdf_llm_server.rag.ingestion.parser_models import ParsedDocument, ParsedPage
+from technical_rag.rag.ingestion.parser_models import ParsedDocument, ParsedPage
 
 # Minimum SequenceMatcher ratio to consider a cross-parser block match
 _MATCH_THRESHOLD = 0.6

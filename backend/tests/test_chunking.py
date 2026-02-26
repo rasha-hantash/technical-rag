@@ -2,14 +2,14 @@
 
 import pytest
 
-from pdf_llm_server.rag.ingestion.chunking import (
+from technical_rag.rag.ingestion.chunking import (
     ChunkData,
     chunk_parsed_document,
     detect_content_type,
     fixed_size_chunking,
     semantic_chunking_by_paragraphs,
 )
-from pdf_llm_server.rag.ingestion.parser_models import (
+from technical_rag.rag.ingestion.parser_models import (
     ParsedDocument,
     ParsedPage,
     TableData,

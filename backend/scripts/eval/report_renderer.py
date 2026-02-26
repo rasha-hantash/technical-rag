@@ -211,7 +211,6 @@ def generate_html_report(
     try:
         # Determine if each parser uses normalized bboxes
         normalized_map = {
-            "reducto": True,
             "pymupdf": False,
         }
 

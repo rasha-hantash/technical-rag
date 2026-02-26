@@ -14,7 +14,7 @@ from pathlib import Path
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from pdf_llm_server.rag.ingestion.pdf_parser import parse_pdf
+from technical_rag.rag.ingestion.pdf_parser import parse_pdf
 
 
 def main():

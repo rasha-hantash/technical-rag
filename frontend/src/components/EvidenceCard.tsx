@@ -1,16 +1,16 @@
-import type { SourceResponse } from '../lib/types'
-import { PdfPageViewer } from './PdfPageViewer'
+import type { SourceResponse } from "../lib/types";
+import { PdfPageViewer } from "./PdfPageViewer";
 
 interface EvidenceCardProps {
-  source: SourceResponse
-  index: number
-  isExpanded: boolean
-  onToggle: () => void
+  source: SourceResponse;
+  index: number;
+  isExpanded: boolean;
+  onToggle: () => void;
 }
 
 function shortFileName(filePath: string): string {
-  const parts = filePath.split('/')
-  return parts[parts.length - 1] || filePath
+  const parts = filePath.split("/");
+  return parts[parts.length - 1] || filePath;
 }
 
 export function EvidenceCard({
@@ -23,8 +23,8 @@ export function EvidenceCard({
     <div
       className={`border rounded-lg transition-colors ${
         isExpanded
-          ? 'border-terracotta bg-terracotta-light'
-          : 'border-border-warm bg-warm-white hover:border-border-warm-hover'
+          ? "border-terracotta bg-terracotta-light"
+          : "border-border-warm bg-warm-white hover:border-border-warm-hover"
       }`}
     >
       <button
@@ -33,7 +33,7 @@ export function EvidenceCard({
       >
         <svg
           className={`h-4 w-4 mt-0.5 shrink-0 transition-transform ${
-            isExpanded ? 'rotate-90 text-terracotta' : 'text-stone-400'
+            isExpanded ? "rotate-90 text-terracotta" : "text-stone-400"
           }`}
           fill="none"
           stroke="currentColor"
@@ -53,13 +53,21 @@ export function EvidenceCard({
               [{index + 1}]
             </span>
             {source.page_number && (
-              <span className="text-stone-500">
-                Page {source.page_number}
-              </span>
+              <span className="text-stone-500">Page {source.page_number}</span>
             )}
             <span className="text-stone-400 truncate">
-              {shortFileName(source.file_path)}
+              {source.book_title || shortFileName(source.file_path)}
             </span>
+            {source.section_hierarchy && (
+              <span className="text-stone-400 truncate text-xs">
+                {source.section_hierarchy}
+              </span>
+            )}
+            {source.publication_year && (
+              <span className="text-stone-400">
+                ({source.publication_year})
+              </span>
+            )}
           </div>
           <p className="mt-1 text-xs text-stone-600 line-clamp-2 leading-relaxed">
             {source.content_preview}
@@ -85,5 +93,5 @@ export function EvidenceCard({
         </div>
       )}
     </div>
-  )
+  );
 }

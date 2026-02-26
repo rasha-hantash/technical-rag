@@ -7,7 +7,7 @@ from uuid import uuid4
 
 import pytest
 
-from pdf_llm_server.rag import (
+from technical_rag.rag import (
     CohereReranker,
     CrossEncoderReranker,
     SearchResult,
@@ -68,12 +68,12 @@ def sample_results():
 
 class TestCohereRerankerInit:
     def test_init_with_api_key(self):
-        with patch("pdf_llm_server.rag.retrieval.reranker.CohereClient") as mock_cls:
+        with patch("technical_rag.rag.retrieval.reranker.CohereClient") as mock_cls:
             CohereReranker(api_key="test-key")
             mock_cls.assert_called_once_with(api_key="test-key", model=None)
 
     def test_init_from_env(self):
-        with patch("pdf_llm_server.rag.retrieval.reranker.CohereClient") as mock_cls:
+        with patch("technical_rag.rag.retrieval.reranker.CohereClient") as mock_cls:
             CohereReranker()
             mock_cls.assert_called_once_with(api_key=None, model=None)
 
@@ -84,14 +84,14 @@ class TestCohereRerankerInit:
                 CohereReranker()
 
     def test_init_custom_model(self):
-        with patch("pdf_llm_server.rag.retrieval.reranker.CohereClient") as mock_cls:
+        with patch("technical_rag.rag.retrieval.reranker.CohereClient") as mock_cls:
             CohereReranker(api_key="test-key", model="rerank-english-v2.0")
             mock_cls.assert_called_once_with(api_key="test-key", model="rerank-english-v2.0")
 
 
 class TestCohereRerank:
     def test_rerank_reorders_results(self, sample_results):
-        with patch("pdf_llm_server.rag.retrieval.reranker.CohereClient") as mock_cls:
+        with patch("technical_rag.rag.retrieval.reranker.CohereClient") as mock_cls:
             mock_client = MagicMock()
             mock_client.model = "rerank-v3.5"
             mock_cls.return_value = mock_client
@@ -113,13 +113,13 @@ class TestCohereRerank:
             assert reranked[1].score == 0.82
 
     def test_rerank_empty_results(self):
-        with patch("pdf_llm_server.rag.retrieval.reranker.CohereClient"):
+        with patch("technical_rag.rag.retrieval.reranker.CohereClient"):
             reranker = CohereReranker(api_key="test-key")
             results = reranker.rerank("query", [], top_k=5)
             assert results == []
 
     def test_rerank_passes_correct_documents(self, sample_results):
-        with patch("pdf_llm_server.rag.retrieval.reranker.CohereClient") as mock_cls:
+        with patch("technical_rag.rag.retrieval.reranker.CohereClient") as mock_cls:
             mock_client = MagicMock()
             mock_client.model = "rerank-v3.5"
             mock_cls.return_value = mock_client
@@ -140,19 +140,19 @@ class TestCohereRerank:
 
 class TestCrossEncoderRerankerInit:
     def test_init_default_model(self):
-        with patch("pdf_llm_server.rag.retrieval.reranker.CrossEncoder") as mock_ce:
+        with patch("technical_rag.rag.retrieval.reranker.CrossEncoder") as mock_ce:
             reranker = CrossEncoderReranker()
             mock_ce.assert_called_once_with("cross-encoder/ms-marco-MiniLM-L-6-v2")
 
     def test_init_custom_model(self):
-        with patch("pdf_llm_server.rag.retrieval.reranker.CrossEncoder") as mock_ce:
+        with patch("technical_rag.rag.retrieval.reranker.CrossEncoder") as mock_ce:
             reranker = CrossEncoderReranker(model_name="cross-encoder/ms-marco-TinyBERT-L-2-v2")
             mock_ce.assert_called_once_with("cross-encoder/ms-marco-TinyBERT-L-2-v2")
 
 
 class TestCrossEncoderRerank:
     def test_rerank_reorders_results(self, sample_results):
-        with patch("pdf_llm_server.rag.retrieval.reranker.CrossEncoder") as mock_ce:
+        with patch("technical_rag.rag.retrieval.reranker.CrossEncoder") as mock_ce:
             mock_model = MagicMock()
             mock_ce.return_value = mock_model
             # Return scores: index 2 highest, index 0 middle, index 1 lowest
@@ -168,13 +168,13 @@ class TestCrossEncoderRerank:
             assert reranked[1].score == 0.6
 
     def test_rerank_empty_results(self):
-        with patch("pdf_llm_server.rag.retrieval.reranker.CrossEncoder"):
+        with patch("technical_rag.rag.retrieval.reranker.CrossEncoder"):
             reranker = CrossEncoderReranker()
             results = reranker.rerank("query", [], top_k=5)
             assert results == []
 
     def test_rerank_passes_correct_pairs(self, sample_results):
-        with patch("pdf_llm_server.rag.retrieval.reranker.CrossEncoder") as mock_ce:
+        with patch("technical_rag.rag.retrieval.reranker.CrossEncoder") as mock_ce:
             mock_model = MagicMock()
             mock_ce.return_value = mock_model
             mock_model.predict.return_value = [0.9, 0.5, 0.3]

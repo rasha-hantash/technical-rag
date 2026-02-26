@@ -11,7 +11,7 @@ class PipelineVariant(BaseModel):
     """A single pipeline configuration to evaluate."""
 
     name: str
-    parser: str  # "pymupdf" or "reducto"
+    parser: str  # "pymupdf"
     chunking: str  # "semantic" or "fixed"
     reranker: str  # "none", "cohere", or "cross-encoder"
 
@@ -21,20 +21,19 @@ class PipelineVariant(BaseModel):
 
 
 def get_default_matrix() -> list[PipelineVariant]:
-    """Return the full evaluation matrix (12 variants)."""
+    """Return the full evaluation matrix (6 variants)."""
     variants = []
-    for parser in ("pymupdf", "reducto"):
-        for chunking in ("semantic", "fixed"):
-            for reranker in ("none", "cohere", "cross-encoder"):
-                name = f"{parser}-{chunking}-{reranker}"
-                variants.append(
-                    PipelineVariant(
-                        name=name,
-                        parser=parser,
-                        chunking=chunking,
-                        reranker=reranker,
-                    )
+    for chunking in ("semantic", "fixed"):
+        for reranker in ("none", "cohere", "cross-encoder"):
+            name = f"pymupdf-{chunking}-{reranker}"
+            variants.append(
+                PipelineVariant(
+                    name=name,
+                    parser="pymupdf",
+                    chunking=chunking,
+                    reranker=reranker,
                 )
+            )
     return variants
 
 
@@ -48,9 +47,9 @@ def get_quick_matrix() -> list[PipelineVariant]:
             reranker="none",
         ),
         PipelineVariant(
-            name="reducto-semantic-none",
-            parser="reducto",
+            name="pymupdf-semantic-cohere",
+            parser="pymupdf",
             chunking="semantic",
-            reranker="none",
+            reranker="cohere",
         ),
     ]

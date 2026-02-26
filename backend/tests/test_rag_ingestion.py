@@ -8,7 +8,7 @@ import pytest
 
 from psycopg2.extras import RealDictCursor
 
-from pdf_llm_server.rag import (
+from technical_rag.rag import (
     PathValidationError,
     PgVectorStore,
     RAGIngestionPipeline,
@@ -25,7 +25,7 @@ def db():
     """Create database connection for tests."""
     connection_string = os.getenv(
         "DATABASE_URL",
-        "postgresql://postgres:postgres@localhost:5432/pdf_llm_rag",
+        "postgresql://postgres:postgres@localhost:5432/technical_rag",
     )
     store = PgVectorStore(connection_string)
     store.connect()
