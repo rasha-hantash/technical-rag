@@ -1,4 +1,4 @@
-"""Embedding generation client for OpenAI text-embedding-3-small model."""
+"""Embedding generation client for OpenAI text-embedding-3-large model."""
 
 import os
 import time
@@ -10,20 +10,20 @@ from openai import OpenAI, RateLimitError, APIStatusError
 from ...logger import logger
 
 # Constants
-MODEL = "text-embedding-3-small"
-EMBEDDING_DIMENSIONS = 1536
-MAX_TOKENS_PER_BATCH = 8191  # OpenAI's limit for text-embedding-3-small
+MODEL = "text-embedding-3-large"
+EMBEDDING_DIMENSIONS = 3072
+MAX_TOKENS_PER_BATCH = 8191  # OpenAI's limit for text-embedding-3-large
 MAX_RETRIES = 3
 INITIAL_RETRY_DELAY_SECONDS = 1
 
-# Tokenizer for accurate token counting (text-embedding-3-small uses cl100k_base)
+# Tokenizer for accurate token counting (text-embedding-3-large uses cl100k_base)
 _tokenizer = tiktoken.get_encoding("cl100k_base")
 
 
 def count_tokens(text: str) -> int:
     """Count tokens for a text string using tiktoken.
 
-    Uses the cl100k_base encoding which is used by text-embedding-3-small.
+    Uses the cl100k_base encoding which is used by text-embedding-3-large.
 
     Args:
         text: The text to count tokens for.
@@ -100,7 +100,7 @@ class EmbeddingClient:
             text: The text to generate an embedding for.
 
         Returns:
-            Embedding vector of 1536 floats.
+            Embedding vector of 3072 floats.
 
         Raises:
             Exception: If embedding generation fails after retries.
@@ -331,7 +331,7 @@ def generate_embedding(text: str) -> list[float]:
         text: The text to generate an embedding for.
 
     Returns:
-        Embedding vector of 1536 floats.
+        Embedding vector of 3072 floats.
 
     Raises:
         RuntimeError: If embedding generation fails after retries.

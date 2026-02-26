@@ -9,6 +9,7 @@ from .pipeline import (
 from .pdf_parser import parse_pdf, parse_pdf_pymupdf
 from .parser_models import ParsedDocument, ParsedPage, TextBlock, TableData
 from .chunking import (
+    concept_aware_chunking,
     fixed_size_chunking,
     semantic_chunking_by_paragraphs,
     chunk_parsed_document,
@@ -29,6 +30,7 @@ __all__ = [
     "ParsedPage",
     "TextBlock",
     "TableData",
+    "concept_aware_chunking",
     "fixed_size_chunking",
     "semantic_chunking_by_paragraphs",
     "chunk_parsed_document",

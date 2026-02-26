@@ -1,9 +1,10 @@
 """Text chunking utilities for the RAG pipeline."""
 
 import re
+from dataclasses import dataclass, field
 
 from ..models import ChunkData
-from .parser_models import ParsedDocument
+from .parser_models import ParsedDocument, TextBlock
 
 
 def fixed_size_chunking(
@@ -185,18 +186,217 @@ def _find_chunk_block_bboxes(
     return bboxes
 
 
+@dataclass
+class _ChunkAccumulator:
+    """Accumulates blocks into a single chunk, tracking metadata."""
+
+    texts: list[str] = field(default_factory=list)
+    block_types: list[str] = field(default_factory=list)
+    bboxes: list[list[float] | None] = field(default_factory=list)
+    page_number: int = 1
+    section_hierarchy: str = ""
+    total_chars: int = 0
+
+    def add(self, text: str, block_type: str, bbox: list[float] | None) -> None:
+        self.texts.append(text)
+        self.block_types.append(block_type)
+        self.bboxes.append(bbox)
+        self.total_chars += len(text)
+
+    @property
+    def is_empty(self) -> bool:
+        return len(self.texts) == 0
+
+    def _dominant_type(self) -> str:
+        """Return the most common block type in the accumulator."""
+        if not self.block_types:
+            return "paragraph"
+        # If any code block, the whole chunk is code-contextual
+        if "code_block" in self.block_types:
+            return "code_block"
+        # Otherwise most frequent
+        from collections import Counter
+        counts = Counter(self.block_types)
+        return counts.most_common(1)[0][0]
+
+    def flush(self, position: int) -> ChunkData | None:
+        """Emit accumulated content as a ChunkData, then reset."""
+        if not self.texts:
+            return None
+        content = "\n\n".join(self.texts)
+        primary_type = self._dominant_type()
+        all_bboxes = [b for b in self.bboxes if b is not None]
+        first_bbox = all_bboxes[0] if all_bboxes else None
+        chunk = ChunkData(
+            content=content,
+            chunk_type=primary_type,
+            page_number=self.page_number,
+            position=position,
+            bbox=first_bbox,
+            block_bboxes=all_bboxes or None,
+            section_hierarchy=self.section_hierarchy or None,
+        )
+        self.texts.clear()
+        self.block_types.clear()
+        self.bboxes.clear()
+        self.total_chars = 0
+        return chunk
+
+
+def concept_aware_chunking(
+    doc: ParsedDocument, max_chunk_size: int = 2500
+) -> list[ChunkData]:
+    """Chunk a technical book with concept/section awareness.
+
+    Rules:
+    1. Never cross a section heading (heading_level 1 or 2).
+    2. Keep explanatory text with its following code block as one chunk.
+    3. Treat callouts/tips/warnings as distinct chunks with metadata.
+    4. Larger max_chunk_size (2500) for architecture concepts.
+    5. Track section hierarchy in chunk metadata.
+
+    Args:
+        doc: ParsedDocument with enriched TextBlock fields.
+        max_chunk_size: Maximum characters per chunk.
+
+    Returns:
+        List of ChunkData with section_hierarchy populated.
+    """
+    chunks: list[ChunkData] = []
+    position = 0
+
+    # heading_stack[level] = title, e.g. {1: "Chapter 5", 2: "5.3 CQRS"}
+    heading_stack: dict[int, str] = {}
+
+    def _current_hierarchy() -> str:
+        if not heading_stack:
+            return ""
+        return " > ".join(
+            heading_stack[k] for k in sorted(heading_stack.keys())
+        )
+
+    def _flush_acc(acc: _ChunkAccumulator) -> None:
+        nonlocal position
+        chunk = acc.flush(position)
+        if chunk:
+            chunks.append(chunk)
+            position += 1
+
+    acc = _ChunkAccumulator()
+
+    for page in doc.pages:
+        # Update accumulator page number
+        acc.page_number = page.page_number
+
+        for block in page.blocks:
+            # --- Heading: flush and update hierarchy ---
+            if block.block_type == "heading":
+                _flush_acc(acc)
+
+                level = block.heading_level or 2
+
+                # Use TOC title if available for this page/heading
+                toc_title = None
+                if doc.toc and page.page_number in doc.toc:
+                    for toc_level, toc_text in doc.toc[page.page_number]:
+                        # Match TOC entry to this heading by level or text similarity
+                        if toc_level == level or block.text.strip().lower() in toc_text.lower():
+                            toc_title = toc_text
+                            break
+
+                heading_text = toc_title or block.text.strip()
+
+                # Truncate stack: remove all levels >= current
+                heading_stack = {
+                    k: v for k, v in heading_stack.items() if k < level
+                }
+                heading_stack[level] = heading_text
+
+                acc.section_hierarchy = _current_hierarchy()
+                acc.page_number = page.page_number
+
+                # Emit heading as start of a new chunk (include it in accumulator)
+                acc.add(block.text, "heading", block.bbox)
+                continue
+
+            # --- Callout: flush, emit as its own chunk ---
+            if block.block_type == "callout" and block.callout_type:
+                _flush_acc(acc)
+                chunks.append(
+                    ChunkData(
+                        content=block.text,
+                        chunk_type=block.callout_type,
+                        page_number=page.page_number,
+                        position=position,
+                        bbox=block.bbox,
+                        block_bboxes=[block.bbox] if block.bbox else None,
+                        section_hierarchy=_current_hierarchy() or None,
+                    )
+                )
+                position += 1
+                continue
+
+            # --- Code block: keep with preceding explanation ---
+            if block.block_type == "code_block":
+                if acc.total_chars + len(block.text) > max_chunk_size and not acc.is_empty:
+                    # Too big to fit — flush explanation, start fresh with code
+                    _flush_acc(acc)
+                acc.add(block.text, "code_block", block.bbox)
+                acc.page_number = page.page_number
+                acc.section_hierarchy = _current_hierarchy()
+                continue
+
+            # --- Paragraph / list_item: accumulate ---
+            if acc.total_chars + len(block.text) > max_chunk_size and not acc.is_empty:
+                _flush_acc(acc)
+
+            acc.add(block.text, block.block_type, block.bbox)
+            acc.page_number = page.page_number
+            acc.section_hierarchy = _current_hierarchy()
+
+        # Handle tables as separate chunks (per page)
+        for table in page.tables:
+            _flush_acc(acc)
+            table_lines = []
+            if table.headers:
+                table_lines.append(" | ".join(table.headers))
+                table_lines.append("-" * 40)
+            for row in table.rows:
+                table_lines.append(" | ".join(row))
+            if table_lines:
+                chunks.append(
+                    ChunkData(
+                        content="\n".join(table_lines),
+                        chunk_type="table",
+                        page_number=page.page_number,
+                        position=position,
+                        bbox=None,
+                        section_hierarchy=_current_hierarchy() or None,
+                    )
+                )
+                position += 1
+
+    # Flush remaining
+    _flush_acc(acc)
+
+    return chunks
+
+
 def chunk_parsed_document(
-    doc: ParsedDocument, strategy: str = "semantic"
+    doc: ParsedDocument, strategy: str = "concept"
 ) -> list[ChunkData]:
     """Chunk a parsed PDF document.
 
     Args:
         doc: ParsedDocument from parse_pdf().
-        strategy: "semantic" for paragraph-aware or "fixed" for fixed-size.
+        strategy: "concept" (default), "semantic", or "fixed".
 
     Returns:
         List of ChunkData ready for database insertion.
     """
+    if strategy == "concept":
+        return concept_aware_chunking(doc)
+
     chunks = []
     position = 0
 
