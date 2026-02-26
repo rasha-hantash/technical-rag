@@ -95,6 +95,69 @@ npm run dev
 | GET    | `/api/v1/documents/{id}/sections` | Get chapter/section tree         |
 | GET    | `/api/v1/documents/{id}/file`     | Download original PDF            |
 
+### Example Requests
+
+**Ask a question:**
+
+```bash
+curl -X POST http://localhost:8000/api/v1/rag/query \
+  -H "Content-Type: application/json" \
+  -d '{"question": "What is the recommended way to handle errors in Rust?", "top_k": 5}'
+```
+
+**Upload a book:**
+
+```bash
+curl -X POST http://localhost:8000/api/v1/rag/ingest/batch \
+  -F "files=@docs/rust-programming-language.pdf" \
+  -F "title=The Rust Programming Language" \
+  -F "author=Steve Klabnik and Carol Nichols" \
+  -F "publication_year=2023"
+```
+
+**Upload multiple books at once:**
+
+```bash
+curl -X POST http://localhost:8000/api/v1/rag/ingest/batch \
+  -F "files=@docs/rust-programming-language.pdf" \
+  -F "files=@docs/designing-data-intensive-applications.pdf" \
+  -F "title=The Rust Programming Language" \
+  -F "author=Steve Klabnik and Carol Nichols"
+```
+
+**List all books:**
+
+```bash
+curl http://localhost:8000/api/v1/documents
+```
+
+**Update book metadata:**
+
+```bash
+curl -X PUT http://localhost:8000/api/v1/documents/{document_id}/metadata \
+  -H "Content-Type: application/json" \
+  -d '{"title": "Designing Data-Intensive Applications", "author": "Martin Kleppmann", "publication_year": 2017}'
+```
+
+**Get chapter/section tree:**
+
+```bash
+curl http://localhost:8000/api/v1/documents/{document_id}/sections
+```
+
+**Download original PDF:**
+
+```bash
+curl -O http://localhost:8000/api/v1/documents/{document_id}/file
+```
+
+**Health check:**
+
+```bash
+curl http://localhost:8000/health
+curl http://localhost:8000/ready
+```
+
 ## Key Design Decisions
 
 **PyMuPDF over Reducto** — Technical books are born-digital PDFs with clean text layers. PyMuPDF extracts directly from the PDF structure without API costs. Tesseract OCR is kept as a passive fallback for rare scanned books.
