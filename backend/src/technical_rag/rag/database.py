@@ -15,7 +15,7 @@ class PgVectorStore:
     def __init__(self, connection_string: str | None = None):
         self.connection_string = connection_string or os.getenv(
             "DATABASE_URL",
-            "postgresql://postgres:postgres@localhost:5432/pdf_llm_rag",
+            "postgresql://postgres:postgres@localhost:5432/technical_rag",
         )
         self.conn = None
         self._vector_registered = False

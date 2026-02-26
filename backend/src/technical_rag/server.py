@@ -23,7 +23,6 @@ from .rag import (
     RAGGenerator,
     RAGIngestionPipeline,
     RAGRetriever,
-    ReductoParser,
 )
 
 # Maximum file size for uploads (50MB)
@@ -119,10 +118,6 @@ async def lifespan(app: FastAPI):
 
     app.state.embedding_client = EmbeddingClient()
 
-    app.state.reducto_parser = None
-    if os.getenv("PDF_PARSER", "pymupdf").lower() == "reducto":
-        app.state.reducto_parser = ReductoParser()
-
     app.state.reranker = None
     reranker_type = os.getenv("RERANKER", "").lower()
     if reranker_type == "cohere":
@@ -142,7 +137,6 @@ async def lifespan(app: FastAPI):
     app.state.ingestion_pipeline = RAGIngestionPipeline(
         db=app.state.db,
         embedding_client=app.state.embedding_client,
-        reducto_parser=app.state.reducto_parser,
     )
 
     logger.info("server ready")
@@ -154,8 +148,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="PDF RAG API",
-    description="Document ingestion and retrieval-augmented generation API",
+    title="Technical Book Rack API",
+    description="Technical book ingestion and retrieval-augmented generation API",
     version="0.1.0",
     lifespan=lifespan,
 )

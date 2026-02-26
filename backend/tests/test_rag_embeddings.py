@@ -3,7 +3,7 @@
 import pytest
 from unittest.mock import Mock, patch
 
-from pdf_llm_server.rag.llm_clients.embeddings import (
+from technical_rag.rag.llm_clients.embeddings import (
     EmbeddingClient,
     EmbeddingResult,
     count_tokens,
@@ -73,12 +73,12 @@ class TestEmbeddingResult:
 
 class TestEmbeddingClientInit:
     def test_init_with_api_key(self):
-        with patch("pdf_llm_server.rag.llm_clients.embeddings.OpenAI") as mock_openai:
+        with patch("technical_rag.rag.llm_clients.embeddings.OpenAI") as mock_openai:
             _ = EmbeddingClient(api_key="test-key")
             mock_openai.assert_called_once_with(api_key="test-key")
 
     def test_init_from_env(self):
-        with patch("pdf_llm_server.rag.llm_clients.embeddings.OpenAI") as mock_openai:
+        with patch("technical_rag.rag.llm_clients.embeddings.OpenAI") as mock_openai:
             with patch.dict("os.environ", {"OPENAI_API_KEY": "env-key"}):
                 _ = EmbeddingClient()
                 mock_openai.assert_called_once_with(api_key="env-key")
@@ -94,7 +94,7 @@ class TestGenerateEmbeddingSingle:
         """Test generating embedding for a single text."""
         mock_embedding = [0.1] * 1536
 
-        with patch("pdf_llm_server.rag.llm_clients.embeddings.OpenAI") as mock_openai_class:
+        with patch("technical_rag.rag.llm_clients.embeddings.OpenAI") as mock_openai_class:
             mock_client = Mock()
             mock_openai_class.return_value = mock_client
 
@@ -117,8 +117,8 @@ class TestGenerateEmbeddingSingle:
         """Test that single embedding failure raises RuntimeError."""
         from openai import RateLimitError
 
-        with patch("pdf_llm_server.rag.llm_clients.embeddings.OpenAI") as mock_openai_class:
-            with patch("pdf_llm_server.rag.llm_clients.embeddings.time.sleep"):
+        with patch("technical_rag.rag.llm_clients.embeddings.OpenAI") as mock_openai_class:
+            with patch("technical_rag.rag.llm_clients.embeddings.time.sleep"):
                 mock_client = Mock()
                 mock_openai_class.return_value = mock_client
 
@@ -140,7 +140,7 @@ class TestGenerateEmbeddingsBatch:
         """Test generating embeddings for multiple texts in one batch."""
         mock_embeddings = [[0.1] * 1536, [0.2] * 1536, [0.3] * 1536]
 
-        with patch("pdf_llm_server.rag.llm_clients.embeddings.OpenAI") as mock_openai_class:
+        with patch("technical_rag.rag.llm_clients.embeddings.OpenAI") as mock_openai_class:
             mock_client = Mock()
             mock_openai_class.return_value = mock_client
 
@@ -165,7 +165,7 @@ class TestGenerateEmbeddingsBatch:
 
     def test_generate_embeddings_empty_list(self):
         """Test that empty input returns empty result."""
-        with patch("pdf_llm_server.rag.llm_clients.embeddings.OpenAI"):
+        with patch("technical_rag.rag.llm_clients.embeddings.OpenAI"):
             client = EmbeddingClient(api_key="test-key")
             result = client.generate_embeddings([])
             assert isinstance(result, EmbeddingResult)
@@ -176,7 +176,7 @@ class TestGenerateEmbeddingsBatch:
         """Test that embeddings are returned in input order even if API returns out of order."""
         mock_embeddings = [[0.1] * 1536, [0.2] * 1536]
 
-        with patch("pdf_llm_server.rag.llm_clients.embeddings.OpenAI") as mock_openai_class:
+        with patch("technical_rag.rag.llm_clients.embeddings.OpenAI") as mock_openai_class:
             mock_client = Mock()
             mock_openai_class.return_value = mock_client
 
@@ -207,7 +207,7 @@ class TestGenerateEmbeddingsLargeBatchSplits:
 
         mock_embedding = [0.1] * 1536
 
-        with patch("pdf_llm_server.rag.llm_clients.embeddings.OpenAI") as mock_openai_class:
+        with patch("technical_rag.rag.llm_clients.embeddings.OpenAI") as mock_openai_class:
             mock_client = Mock()
             mock_openai_class.return_value = mock_client
 
@@ -240,8 +240,8 @@ class TestRetryAndPartialFailure:
 
         mock_embedding = [0.1] * 1536
 
-        with patch("pdf_llm_server.rag.llm_clients.embeddings.OpenAI") as mock_openai_class:
-            with patch("pdf_llm_server.rag.llm_clients.embeddings.time.sleep") as mock_sleep:
+        with patch("technical_rag.rag.llm_clients.embeddings.OpenAI") as mock_openai_class:
+            with patch("technical_rag.rag.llm_clients.embeddings.time.sleep") as mock_sleep:
                 mock_client = Mock()
                 mock_openai_class.return_value = mock_client
 
@@ -278,8 +278,8 @@ class TestRetryAndPartialFailure:
 
         mock_embedding = [0.1] * 1536
 
-        with patch("pdf_llm_server.rag.llm_clients.embeddings.OpenAI") as mock_openai_class:
-            with patch("pdf_llm_server.rag.llm_clients.embeddings.time.sleep") as mock_sleep:
+        with patch("technical_rag.rag.llm_clients.embeddings.OpenAI") as mock_openai_class:
+            with patch("technical_rag.rag.llm_clients.embeddings.time.sleep") as mock_sleep:
                 mock_client = Mock()
                 mock_openai_class.return_value = mock_client
 
@@ -310,7 +310,7 @@ class TestRetryAndPartialFailure:
         """Test that 4xx errors (except 429) record failure without retrying."""
         from openai import APIStatusError
 
-        with patch("pdf_llm_server.rag.llm_clients.embeddings.OpenAI") as mock_openai_class:
+        with patch("technical_rag.rag.llm_clients.embeddings.OpenAI") as mock_openai_class:
             mock_client = Mock()
             mock_openai_class.return_value = mock_client
 
@@ -339,8 +339,8 @@ class TestRetryAndPartialFailure:
         """Test that failure is recorded after max retries."""
         from openai import RateLimitError
 
-        with patch("pdf_llm_server.rag.llm_clients.embeddings.OpenAI") as mock_openai_class:
-            with patch("pdf_llm_server.rag.llm_clients.embeddings.time.sleep"):
+        with patch("technical_rag.rag.llm_clients.embeddings.OpenAI") as mock_openai_class:
+            with patch("technical_rag.rag.llm_clients.embeddings.time.sleep"):
                 mock_client = Mock()
                 mock_openai_class.return_value = mock_client
 
@@ -376,8 +376,8 @@ class TestRetryAndPartialFailure:
         large_text = "hello world " * 2000  # ~4000 tokens
         texts = [large_text, large_text, large_text]
 
-        with patch("pdf_llm_server.rag.llm_clients.embeddings.OpenAI") as mock_openai_class:
-            with patch("pdf_llm_server.rag.llm_clients.embeddings.time.sleep"):
+        with patch("technical_rag.rag.llm_clients.embeddings.OpenAI") as mock_openai_class:
+            with patch("technical_rag.rag.llm_clients.embeddings.time.sleep"):
                 mock_client = Mock()
                 mock_openai_class.return_value = mock_client
 

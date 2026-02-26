@@ -13,7 +13,6 @@ from ..database import PgVectorStore
 from ..llm_clients.embeddings import EmbeddingClient
 from ..models import ChunkRecord, IngestedDocument
 from .pdf_parser import parse_pdf
-from .reducto_parser import ReductoParser
 
 
 class PathValidationError(ValueError):
@@ -94,7 +93,6 @@ def ingest_document(
     chunking_strategy: str = "semantic",
     allowed_dirs: list[Path] | None = None,
     original_filename: str | None = None,
-    reducto_parser: ReductoParser | None = None,
     file_size: int | None = None,
 ) -> IngestResult:
     """Ingest a single PDF document into the RAG system.
@@ -110,7 +108,6 @@ def ingest_document(
             If provided, file_path must be within one of these directories.
         original_filename: Optional original filename to store in the database.
             If None, the file_path basename is used.
-        reducto_parser: Optional ReductoParser instance for Reducto-based parsing.
 
     Returns:
         IngestResult with document info and chunk count.
@@ -168,7 +165,7 @@ def ingest_document(
 
         try:
             # Step 4: Parse PDF (parser handles OCR assessment internally)
-            parsed_doc = parse_pdf(file_path, reducto_parser=reducto_parser)
+            parsed_doc = parse_pdf(file_path)
 
             # Step 5: Chunk content
             chunk_data_list = chunk_parsed_document(parsed_doc, strategy=chunking_strategy)
@@ -260,7 +257,6 @@ class RAGIngestionPipeline:
         embedding_client: EmbeddingClient | None = None,
         chunking_strategy: str = "semantic",
         allowed_dirs: list[Path] | None = None,
-        reducto_parser: ReductoParser | None = None,
     ):
         """Initialize the ingestion pipeline.
 
@@ -271,13 +267,11 @@ class RAGIngestionPipeline:
             chunking_strategy: Default chunking strategy ("semantic" or "fixed").
             allowed_dirs: Optional list of allowed directories for path validation.
                 If provided, all ingested files must be within these directories.
-            reducto_parser: Optional ReductoParser instance for Reducto-based parsing.
         """
         self.db = db
         self.embedding_client = embedding_client
         self.chunking_strategy = chunking_strategy
         self.allowed_dirs = allowed_dirs
-        self.reducto_parser = reducto_parser
         # Store connection string for creating worker connections in parallel mode
         self._connection_string = db.connection_string
 
@@ -307,7 +301,6 @@ class RAGIngestionPipeline:
             chunking_strategy=self.chunking_strategy,
             allowed_dirs=self.allowed_dirs,
             original_filename=original_filename,
-            reducto_parser=self.reducto_parser,
             file_size=file_size,
         )
 
@@ -321,7 +314,7 @@ class RAGIngestionPipeline:
         """Worker function for parallel ingestion with its own DB connection.
 
         Creates a new database connection for thread safety.
-        OpenAI and Reducto clients are thread-safe, so we reuse them.
+        OpenAI client is thread-safe, so we reuse it.
         """
         worker_db = PgVectorStore(self._connection_string)
         worker_db.connect()
@@ -334,7 +327,6 @@ class RAGIngestionPipeline:
                 chunking_strategy=self.chunking_strategy,
                 allowed_dirs=self.allowed_dirs,
                 original_filename=original_filename,
-                reducto_parser=self.reducto_parser,
                 file_size=file_size,
             )
         finally:

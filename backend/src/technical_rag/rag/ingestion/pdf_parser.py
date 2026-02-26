@@ -1,6 +1,5 @@
 """PDF parsing module using PyMuPDF for text and structure extraction."""
 
-import os
 import statistics
 from pathlib import Path
 
@@ -9,7 +8,6 @@ import fitz  # PyMuPDF
 from ...logger import logger
 from .ocr import assess_needs_ocr, ocr_page
 from .parser_models import ParsedDocument, ParsedPage, TableData, TextBlock
-from .reducto_parser import ReductoParser
 
 # Threshold for detecting garbage text (corrupted font encodings)
 GARBAGE_CONTROL_CHAR_RATIO = 0.1  # >10% control chars = garbage
@@ -258,39 +256,8 @@ def parse_pdf_pymupdf(file_path: str | Path) -> ParsedDocument:
         doc.close()
 
 
-def parse_pdf(
-    file_path: str | Path,
-    reducto_parser: ReductoParser | None = None,
-) -> ParsedDocument:
-    """Parse a PDF file using the configured parser.
-
-    The parser is selected via the PDF_PARSER environment variable:
-    - "pymupdf" (default): Uses PyMuPDF for local parsing
-    - "reducto": Uses Reducto cloud API for parsing
-
-    Args:
-        file_path: Path to the PDF file.
-        reducto_parser: ReductoParser instance to use when PDF_PARSER=reducto.
-
-    For the pymupdf parser, this also assesses OCR needs and logs a warning
-    if the document appears to be scanned. Reducto handles OCR internally.
-    """
-    parser = os.getenv("PDF_PARSER", "pymupdf").lower()
-
-    if parser == "reducto":
-        if reducto_parser is None:
-            raise ValueError(
-                "reducto_parser is required when PDF_PARSER=reducto. "
-                "Pass a ReductoParser instance to parse_pdf()."
-            )
-        return reducto_parser.parse(file_path)
-
-    if parser != "pymupdf":
-        logger.warn(
-            "unknown PDF_PARSER value, falling back to pymupdf",
-            parser=parser,
-        )
-
+def parse_pdf(file_path: str | Path) -> ParsedDocument:
+    """Parse a PDF file using PyMuPDF."""
     needs_ocr = assess_needs_ocr(file_path)
     if needs_ocr:
         logger.warn(
@@ -298,5 +265,4 @@ def parse_pdf(
             file_path=str(file_path),
             message="Text extraction may be incomplete for scanned documents",
         )
-
     return parse_pdf_pymupdf(file_path)

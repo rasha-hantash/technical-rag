@@ -10,20 +10,19 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from pdf_llm_server.logger import logger
-from pdf_llm_server.rag.database import PgVectorStore
-from pdf_llm_server.rag.ingestion.pipeline import ingest_document
-from pdf_llm_server.rag.ingestion.reducto_parser import ReductoParser
-from pdf_llm_server.rag.llm_clients.anthropic_client import AnthropicClient
-from pdf_llm_server.rag.llm_clients.embeddings import EmbeddingClient
-from pdf_llm_server.rag.models import SearchResult
-from pdf_llm_server.rag.retrieval.reranker import (
+from technical_rag.logger import logger
+from technical_rag.rag.database import PgVectorStore
+from technical_rag.rag.ingestion.pipeline import ingest_document
+from technical_rag.rag.llm_clients.anthropic_client import AnthropicClient
+from technical_rag.rag.llm_clients.embeddings import EmbeddingClient
+from technical_rag.rag.models import SearchResult
+from technical_rag.rag.retrieval.reranker import (
     CohereReranker,
     CrossEncoderReranker,
     Reranker,
 )
-from pdf_llm_server.rag.retrieval.retriever import RAGRetriever
-from pdf_llm_server.rag.generation.generator import RAGGenerator
+from technical_rag.rag.retrieval.retriever import RAGRetriever
+from technical_rag.rag.generation.generator import RAGGenerator
 
 from .generation_eval import (
     AggregateGenerationMetrics,
@@ -124,7 +123,6 @@ def run_variant(
     dataset: EvalDataset,
     db: PgVectorStore,
     embedding_client: EmbeddingClient,
-    reducto_parser: ReductoParser | None,
     judge_client: AnthropicClient | None,
     skip_generation: bool = False,
     top_k: int = 5,
@@ -153,7 +151,6 @@ def run_variant(
     # Step 2: ingest corpus
     prev_parser = _set_parser_env(variant.parser)
     try:
-        rp = reducto_parser if variant.parser == "reducto" else None
         ingest_start = time.perf_counter()
 
         for pdf_path in dataset.pdf_corpus:
@@ -167,7 +164,6 @@ def run_variant(
                 db=db,
                 embedding_client=embedding_client,
                 chunking_strategy=variant.chunking,
-                reducto_parser=rp,
             )
             if ingest_result.error:
                 logger.error(
@@ -294,18 +290,6 @@ def run_matrix(
 
     embedding_client = EmbeddingClient()
 
-    # Reducto parser (shared across variants that need it)
-    reducto_parser = None
-    needs_reducto = any(v.parser == "reducto" for v in variants)
-    if needs_reducto:
-        try:
-            reducto_parser = ReductoParser()
-        except (ValueError, ImportError) as e:
-            logger.warn(
-                "reducto parser not available, reducto variants will be skipped",
-                error=str(e),
-            )
-
     # Judge client for generation eval
     judge_client = None
     if not skip_generation:
@@ -333,19 +317,12 @@ def run_matrix(
                 progress=f"{i + 1}/{total}",
             )
 
-            # Skip reducto variants if parser unavailable
-            if variant.parser == "reducto" and reducto_parser is None:
-                vr = VariantResult(variant=variant, error="reducto parser not available")
-                results.append(vr)
-                continue
-
             try:
                 vr = run_variant(
                     variant=variant,
                     dataset=dataset,
                     db=db,
                     embedding_client=embedding_client,
-                    reducto_parser=reducto_parser,
                     judge_client=judge_client,
                     skip_generation=skip_generation,
                     top_k=top_k,

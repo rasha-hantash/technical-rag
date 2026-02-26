@@ -117,4 +117,4 @@ def get_context() -> dict[str, Any]:
 
 
 # Default logger instance
-logger = StructuredLogger("pdf_llm_server")
+logger = StructuredLogger("technical_rag")

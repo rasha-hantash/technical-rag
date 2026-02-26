@@ -6,7 +6,7 @@ from uuid import uuid4
 
 import pytest
 
-from pdf_llm_server.rag import (
+from technical_rag.rag import (
     RAGRetriever,
     RAGGenerator,
     RAGResponse,

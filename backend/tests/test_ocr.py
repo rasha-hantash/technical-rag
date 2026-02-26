@@ -5,7 +5,7 @@ from pathlib import Path
 import fitz
 import pytest
 
-from pdf_llm_server.rag.ingestion.ocr import assess_needs_ocr
+from technical_rag.rag.ingestion.ocr import assess_needs_ocr
 
 
 @pytest.fixture(scope="module")

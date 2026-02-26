@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from pdf_llm_server.rag import PgVectorStore, ChunkRecord
+from technical_rag.rag import PgVectorStore, ChunkRecord
 
 
 # Path to migrations directory (relative to this test file)
@@ -15,7 +15,7 @@ def db():
     """Create a database connection for testing."""
     connection_string = os.getenv(
         "DATABASE_URL",
-        "postgresql://postgres:postgres@localhost:5432/pdf_llm_rag",
+        "postgresql://postgres:postgres@localhost:5432/technical_rag",
     )
     store = PgVectorStore(connection_string)
     store.connect()

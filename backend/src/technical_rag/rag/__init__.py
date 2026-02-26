@@ -7,7 +7,6 @@ from .ingestion import (
     TableData,
     parse_pdf,
     parse_pdf_pymupdf,
-    ReductoParser,
     fixed_size_chunking,
     semantic_chunking_by_paragraphs,
     chunk_parsed_document,
@@ -51,7 +50,6 @@ __all__ = [
     # PDF Parser
     "parse_pdf",
     "parse_pdf_pymupdf",
-    "ReductoParser",
     "ParsedDocument",
     "ParsedPage",
     "TextBlock",
