@@ -59,7 +59,7 @@ task db:migrate:up
 cd backend && uv sync
 
 # Install frontend dependencies
-cd frontend && npm install
+cd frontend && bun i
 ```
 
 ### Environment Variables
@@ -81,7 +81,7 @@ export RERANKER=cohere           # Enable Cohere reranking
 uv run python main.py
 
 # Frontend (from frontend/)
-npm run dev
+bun dev
 ```
 
 ## API

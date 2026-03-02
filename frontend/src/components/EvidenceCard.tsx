@@ -68,6 +68,16 @@ export function EvidenceCard({
                 ({source.publication_year})
               </span>
             )}
+            {source.tags &&
+              source.tags.length > 0 &&
+              source.tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-flex items-center rounded-full bg-stone-100 text-stone-600 text-xs px-2 py-0.5"
+                >
+                  {tag}
+                </span>
+              ))}
           </div>
           <p className="mt-1 text-xs text-stone-600 line-clamp-2 leading-relaxed">
             {source.content_preview}

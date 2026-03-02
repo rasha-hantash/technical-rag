@@ -24,6 +24,7 @@ class SourceReference(BaseModel):
     book_title: str | None = None
     book_author: str | None = None
     publication_year: int | None = None
+    tags: list[str] = []
 
 
 class RAGResponse(BaseModel):
@@ -184,6 +185,7 @@ Please answer the question based only on the provided context."""
                     book_title=doc.title if doc else None,
                     book_author=doc.author if doc else None,
                     publication_year=doc.publication_year if doc else None,
+                    tags=doc.tags if doc else [],
                 )
             )
 

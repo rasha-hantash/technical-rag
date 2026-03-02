@@ -6,6 +6,7 @@ interface UseIngestReturn {
   uploadFiles: (
     files: FileList,
     metadata?: Partial<BookMetadata>,
+    tags?: string[],
   ) => Promise<void>;
   isUploading: boolean;
   uploadingFileName: string | null;
@@ -21,7 +22,11 @@ export function useIngest(onUploadComplete: () => void): UseIngestReturn {
   const [error, setError] = useState<string | null>(null);
 
   const uploadFiles = useCallback(
-    async (files: FileList, metadata?: Partial<BookMetadata>) => {
+    async (
+      files: FileList,
+      metadata?: Partial<BookMetadata>,
+      tags?: string[],
+    ) => {
       setIsUploading(true);
       setError(null);
       const errors: string[] = [];
@@ -48,7 +53,7 @@ export function useIngest(onUploadComplete: () => void): UseIngestReturn {
             : `Uploading ${validFiles.length} files...`,
         );
         try {
-          const batchResult = await ingestBatch(validFiles, metadata);
+          const batchResult = await ingestBatch(validFiles, metadata, tags);
           for (const item of batchResult.results) {
             if (item.error) {
               errors.push(`${item.file_name}: ${item.error}`);

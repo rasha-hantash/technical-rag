@@ -9,6 +9,7 @@ import type {
 export async function ingestBatch(
   files: File[],
   metadata?: Partial<BookMetadata>,
+  tags?: string[],
 ): Promise<BatchIngestResponse> {
   const formData = new FormData();
   for (const file of files) {
@@ -19,6 +20,9 @@ export async function ingestBatch(
   if (metadata?.edition) formData.append("edition", metadata.edition);
   if (metadata?.publication_year != null)
     formData.append("publication_year", String(metadata.publication_year));
+  if (tags && tags.length > 0) {
+    formData.append("tags", JSON.stringify(tags));
+  }
 
   const res = await fetch("/api/v1/rag/ingest/batch", {
     method: "POST",
@@ -36,11 +40,16 @@ export async function ingestBatch(
 export async function queryRag(
   question: string,
   topK = 5,
+  tags?: string[] | null,
 ): Promise<QueryResponse> {
+  const body: Record<string, unknown> = { question, top_k: topK };
+  if (tags && tags.length > 0) {
+    body.tags = tags;
+  }
   const res = await fetch("/api/v1/rag/query", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question, top_k: topK }),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) {

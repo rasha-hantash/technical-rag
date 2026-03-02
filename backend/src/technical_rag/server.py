@@ -1,5 +1,6 @@
 """FastAPI REST API for the RAG pipeline."""
 
+import json
 import os
 import shutil
 import tempfile
@@ -41,6 +42,7 @@ PDF_STORAGE_DIR = Path(os.getenv("PDF_STORAGE_DIR", "./data/pdfs"))
 class QueryRequest(BaseModel):
     question: str = Field(..., min_length=1, max_length=10000)
     top_k: int = Field(default=5, ge=1, le=20)
+    tags: list[str] | None = Field(default=None, description="Tag filter. None or omitted searches all books.")
 
 
 class SourceResponse(BaseModel):
@@ -55,6 +57,7 @@ class SourceResponse(BaseModel):
     book_title: str | None = None
     book_author: str | None = None
     publication_year: int | None = None
+    tags: list[str] = Field(default_factory=list)
 
 
 class QueryResponse(BaseModel):
@@ -210,6 +213,7 @@ def ready(db: PgVectorStore = Depends(get_db)):
 @app.post("/api/v1/rag/ingest/batch", response_model=BatchIngestResponse)
 def ingest_batch(
     files: list[UploadFile] = File(...),
+    tags: str = Form(..., description="JSON array of tags, e.g. '[\"rust\", \"backend\"]'. At least one tag required."),
     title: str | None = Form(None),
     author: str | None = Form(None),
     edition: str | None = Form(None),
@@ -217,6 +221,15 @@ def ingest_batch(
     pipeline: RAGIngestionPipeline = Depends(get_ingestion_pipeline),
 ):
     """Ingest multiple PDF files via batch upload."""
+    try:
+        parsed_tags = json.loads(tags)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="tags must be a valid JSON array")
+    if not isinstance(parsed_tags, list) or not all(isinstance(t, str) for t in parsed_tags):
+        raise HTTPException(status_code=400, detail="tags must be an array of strings")
+    if len(parsed_tags) == 0:
+        raise HTTPException(status_code=400, detail="At least one tag is required")
+
     if len(files) > MAX_BATCH_SIZE:
         raise HTTPException(
             status_code=400,
@@ -282,6 +295,7 @@ def ingest_batch(
                 author=author,
                 edition=edition,
                 publication_year=publication_year,
+                tags=parsed_tags,
             )
 
             for i, result in enumerate(ingest_results):
@@ -334,7 +348,7 @@ def query(
     generator: RAGGenerator = Depends(get_generator),
 ):
     """Answer a question using RAG."""
-    results = retriever.retrieve(request.question, top_k=request.top_k)
+    results = retriever.retrieve(request.question, top_k=request.top_k, tags=request.tags)
     response = generator.generate(request.question, results)
     return QueryResponse(
         answer=response.answer,
@@ -351,6 +365,7 @@ def query(
                 book_title=s.book_title,
                 book_author=s.book_author,
                 publication_year=s.publication_year,
+                tags=s.tags,
             )
             for s in response.sources
         ],
@@ -371,6 +386,7 @@ class DocumentResponse(BaseModel):
     author: str | None = None
     edition: str | None = None
     publication_year: int | None = None
+    tags: list[str] = Field(default_factory=list)
     created_at: str
 
 
@@ -380,7 +396,7 @@ def list_documents(db: PgVectorStore = Depends(get_db)):
     with db.conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute(
             """SELECT d.id, d.file_path, d.status, d.file_size, d.title, d.author,
-                      d.edition, d.publication_year, d.created_at,
+                      d.edition, d.publication_year, d.tags, d.created_at,
                       COUNT(c.id) AS chunks_count
                FROM documents d
                LEFT JOIN chunks c ON c.document_id = d.id
@@ -400,6 +416,7 @@ def list_documents(db: PgVectorStore = Depends(get_db)):
             author=row.get("author"),
             edition=row.get("edition"),
             publication_year=row.get("publication_year"),
+            tags=row.get("tags", []),
             created_at=row["created_at"].isoformat(),
         )
         for row in rows
@@ -450,7 +467,7 @@ def update_document_metadata(
     with db.conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute(
             """SELECT d.id, d.file_path, d.status, d.file_size, d.title, d.author,
-                      d.edition, d.publication_year, d.created_at,
+                      d.edition, d.publication_year, d.tags, d.created_at,
                       COUNT(c.id) AS chunks_count
                FROM documents d
                LEFT JOIN chunks c ON c.document_id = d.id
@@ -471,6 +488,7 @@ def update_document_metadata(
         author=row.get("author"),
         edition=row.get("edition"),
         publication_year=row.get("publication_year"),
+        tags=row.get("tags", []),
         created_at=row["created_at"].isoformat(),
     )
 

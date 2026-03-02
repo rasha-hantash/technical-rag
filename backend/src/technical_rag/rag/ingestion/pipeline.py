@@ -98,6 +98,7 @@ def ingest_document(
     author: str | None = None,
     edition: str | None = None,
     publication_year: int | None = None,
+    tags: list[str] | None = None,
 ) -> IngestResult:
     """Ingest a single PDF document into the RAG system.
 
@@ -169,6 +170,7 @@ def ingest_document(
             author=author,
             edition=edition,
             publication_year=publication_year,
+            tags=tags,
         )
 
         try:
@@ -294,6 +296,7 @@ class RAGIngestionPipeline:
         author: str | None = None,
         edition: str | None = None,
         publication_year: int | None = None,
+        tags: list[str] | None = None,
     ) -> IngestResult:
         """Ingest a single document.
 
@@ -306,6 +309,7 @@ class RAGIngestionPipeline:
             author: Optional book author.
             edition: Optional book edition.
             publication_year: Optional publication year.
+            tags: Optional list of topic tags.
 
         Returns:
             IngestResult with document info and chunk count.
@@ -323,6 +327,7 @@ class RAGIngestionPipeline:
             author=author,
             edition=edition,
             publication_year=publication_year,
+            tags=tags,
         )
 
     def _ingest_worker(
@@ -335,6 +340,7 @@ class RAGIngestionPipeline:
         author: str | None = None,
         edition: str | None = None,
         publication_year: int | None = None,
+        tags: list[str] | None = None,
     ) -> IngestResult:
         """Worker function for parallel ingestion with its own DB connection.
 
@@ -357,6 +363,7 @@ class RAGIngestionPipeline:
                 author=author,
                 edition=edition,
                 publication_year=publication_year,
+                tags=tags,
             )
         finally:
             worker_db.disconnect()
@@ -372,6 +379,7 @@ class RAGIngestionPipeline:
         author: str | None = None,
         edition: str | None = None,
         publication_year: int | None = None,
+        tags: list[str] | None = None,
     ) -> list[IngestResult]:
         """Ingest multiple documents in parallel.
 
@@ -386,6 +394,7 @@ class RAGIngestionPipeline:
             author: Optional book author for all documents.
             edition: Optional book edition for all documents.
             publication_year: Optional publication year for all documents.
+            tags: List of topic tags for all documents (required at API boundary).
 
         Returns:
             List of IngestResult objects in the same order as input file_paths.
@@ -424,6 +433,7 @@ class RAGIngestionPipeline:
                         author=author,
                         edition=edition,
                         publication_year=publication_year,
+                        tags=tags,
                     )
                     results_dict[i] = result
                 except Exception as e:
@@ -456,6 +466,7 @@ class RAGIngestionPipeline:
                         author,
                         edition,
                         publication_year,
+                        tags,
                     ): i
                     for i, fp in enumerate(file_paths)
                 }

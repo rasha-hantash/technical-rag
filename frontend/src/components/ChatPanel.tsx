@@ -1,19 +1,19 @@
-import { useRef, useEffect } from 'react'
-import { DocumentList } from './DocumentList'
-import { MessageBubble } from './MessageBubble'
-import { QueryInput } from './QueryInput'
-import type { Message, DocumentResponse } from '../lib/types'
+import { useRef, useEffect } from "react";
+import { DocumentList } from "./DocumentList";
+import { MessageBubble } from "./MessageBubble";
+import { QueryInput } from "./QueryInput";
+import type { Message, DocumentResponse } from "../lib/types";
 
 interface ChatPanelProps {
-  messages: Message[]
-  documents: DocumentResponse[]
-  isUploading: boolean
-  uploadingFileName: string | null
-  uploadError: string | null
-  isQuerying: boolean
-  onClearUploadError: () => void
-  onFilesSelected: (files: FileList) => void
-  onSubmitQuery: (question: string) => void
+  messages: Message[];
+  documents: DocumentResponse[];
+  isUploading: boolean;
+  uploadingFileName: string | null;
+  uploadError: string | null;
+  isQuerying: boolean;
+  onClearUploadError: () => void;
+  onFilesSelected: (files: FileList, tags: string[]) => void;
+  onSubmitQuery: (question: string, tags: string[] | null) => void;
 }
 
 export function ChatPanel({
@@ -27,11 +27,11 @@ export function ChatPanel({
   onFilesSelected,
   onSubmitQuery,
 }: ChatPanelProps) {
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   return (
     <div className="flex h-full flex-col">
@@ -94,5 +94,5 @@ export function ChatPanel({
         onSubmit={onSubmitQuery}
       />
     </div>
-  )
+  );
 }

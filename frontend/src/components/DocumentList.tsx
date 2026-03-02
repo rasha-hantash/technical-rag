@@ -1,13 +1,27 @@
 import { useState, useRef } from "react";
 import type { DocumentResponse } from "../lib/types";
 
+const PREDEFINED_TAGS = [
+  "rust",
+  "typescript",
+  "javascript",
+  "python",
+  "go",
+  "react",
+  "nextjs",
+  "backend",
+  "frontend",
+  "devops",
+  "architecture",
+];
+
 interface DocumentListProps {
   documents: DocumentResponse[];
   isUploading: boolean;
   uploadingFileName: string | null;
   error: string | null;
   onClearError: () => void;
-  onFilesSelected: (files: FileList) => void;
+  onFilesSelected: (files: FileList, tags: string[]) => void;
 }
 
 function formatFileSize(bytes: number | null): string {
@@ -15,6 +29,14 @@ function formatFileSize(bytes: number | null): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function TagChip({ tag }: { tag: string }) {
+  return (
+    <span className="inline-flex items-center rounded-full bg-stone-100 text-stone-600 text-xs px-2 py-0.5">
+      {tag}
+    </span>
+  );
 }
 
 function StatusBadge({ status }: { status: DocumentResponse["status"] }) {
@@ -67,6 +89,12 @@ export function DocumentList({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
 
+  // Tag selector state for upload flow
+  const [pendingFiles, setPendingFiles] = useState<FileList | null>(null);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [customTagInput, setCustomTagInput] = useState("");
+  const [showTagSelector, setShowTagSelector] = useState(false);
+
   const handleClick = () => {
     fileInputRef.current?.click();
   };
@@ -77,7 +105,10 @@ export function DocumentList({
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      onFilesSelected(e.target.files);
+      setPendingFiles(e.target.files);
+      setSelectedTags([]);
+      setCustomTagInput("");
+      setShowTagSelector(true);
       e.target.value = "";
     }
   };
@@ -92,10 +123,50 @@ export function DocumentList({
         for (const file of pdfFiles) {
           dt.items.add(file);
         }
-        onFilesSelected(dt.files);
+        setPendingFiles(dt.files);
+        setSelectedTags([]);
+        setCustomTagInput("");
+        setShowTagSelector(true);
       }
       e.target.value = "";
     }
+  };
+
+  const toggleTag = (tag: string) => {
+    setSelectedTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
+    );
+  };
+
+  const addCustomTag = () => {
+    const tag = customTagInput.trim().toLowerCase();
+    if (tag && !selectedTags.includes(tag)) {
+      setSelectedTags((prev) => [...prev, tag]);
+    }
+    setCustomTagInput("");
+  };
+
+  const handleCustomTagKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      addCustomTag();
+    }
+  };
+
+  const confirmUpload = () => {
+    if (pendingFiles && selectedTags.length > 0) {
+      onFilesSelected(pendingFiles, selectedTags);
+      setPendingFiles(null);
+      setSelectedTags([]);
+      setShowTagSelector(false);
+    }
+  };
+
+  const cancelUpload = () => {
+    setPendingFiles(null);
+    setSelectedTags([]);
+    setCustomTagInput("");
+    setShowTagSelector(false);
   };
 
   const processedCount = documents.filter(
@@ -123,6 +194,90 @@ export function DocumentList({
           directory: "",
         } as React.InputHTMLAttributes<HTMLInputElement>)}
       />
+
+      {/* Tag selector panel for pending upload */}
+      {showTagSelector && pendingFiles && (
+        <div className="px-4 py-3 border-b border-border-warm bg-cream/50">
+          <div className="text-sm font-medium text-stone-700 mb-2">
+            Select tags for{" "}
+            {pendingFiles.length === 1
+              ? pendingFiles[0].name
+              : `${pendingFiles.length} files`}
+          </div>
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {PREDEFINED_TAGS.map((tag) => (
+              <button
+                key={tag}
+                onClick={() => toggleTag(tag)}
+                className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                  selectedTags.includes(tag)
+                    ? "bg-terracotta text-white"
+                    : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                }`}
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2 mb-3">
+            <input
+              type="text"
+              value={customTagInput}
+              onChange={(e) => setCustomTagInput(e.target.value)}
+              onKeyDown={handleCustomTagKeyDown}
+              placeholder="Add custom tag..."
+              className="flex-1 rounded-lg border border-border-warm bg-warm-white px-2.5 py-1.5 text-xs text-stone-700 placeholder-stone-400 outline-none focus:border-terracotta"
+            />
+            <button
+              onClick={addCustomTag}
+              disabled={!customTagInput.trim()}
+              className="rounded-lg border border-border-warm px-2.5 py-1.5 text-xs font-medium text-stone-600 hover:bg-cream transition-colors disabled:opacity-50"
+            >
+              Add
+            </button>
+          </div>
+          {selectedTags.length > 0 && (
+            <div className="flex flex-wrap gap-1 mb-2">
+              {selectedTags
+                .filter((t) => !PREDEFINED_TAGS.includes(t))
+                .map((tag) => (
+                  <span
+                    key={tag}
+                    className="inline-flex items-center gap-1 rounded-full bg-terracotta text-white text-xs px-2 py-0.5"
+                  >
+                    {tag}
+                    <button
+                      onClick={() => toggleTag(tag)}
+                      className="hover:text-white/70"
+                    >
+                      x
+                    </button>
+                  </span>
+                ))}
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={confirmUpload}
+              disabled={selectedTags.length === 0}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-terracotta px-3 py-1.5 text-xs font-medium text-white hover:bg-terracotta-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Upload {pendingFiles.length === 1 ? "file" : "files"}
+            </button>
+            <button
+              onClick={cancelUpload}
+              className="rounded-lg border border-border-warm px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-cream transition-colors"
+            >
+              Cancel
+            </button>
+            {selectedTags.length === 0 && (
+              <span className="text-xs text-stone-400">
+                Select at least 1 tag
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       {documents.length === 0 && !isUploading ? (
         <div className="text-center px-4 py-4">
@@ -314,6 +469,13 @@ export function DocumentList({
                         {doc.author && doc.publication_year ? " · " : ""}
                         {doc.publication_year}
                       </span>
+                    )}
+                    {doc.tags && doc.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {doc.tags.map((tag) => (
+                          <TagChip key={tag} tag={tag} />
+                        ))}
+                      </div>
                     )}
                   </div>
                   {doc.file_size !== null && (
