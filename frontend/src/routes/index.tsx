@@ -1,63 +1,75 @@
-import { useState, useCallback } from 'react'
-import { createFileRoute } from '@tanstack/react-router'
-import { ChatPanel, EvidencePanel } from '../components'
-import { useDocuments, useIngest, useRagQuery } from '../hooks'
-import type { Message, SourceResponse } from '../lib/types'
+import { useState, useCallback } from "react";
+import { createFileRoute } from "@tanstack/react-router";
+import { ChatPanel, EvidencePanel } from "../components";
+import { useDocuments, useIngest, useRagQuery } from "../hooks";
+import type { Message, SourceResponse } from "../lib/types";
 
-export const Route = createFileRoute('/')({
+export const Route = createFileRoute("/")({
   component: Home,
-})
+});
 
 function Home() {
-  const [messages, setMessages] = useState<Message[]>([])
-  const [currentSources, setCurrentSources] = useState<SourceResponse[]>([])
-  const [showEvidence, setShowEvidence] = useState(false)
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [currentSources, setCurrentSources] = useState<SourceResponse[]>([]);
+  const [showEvidence, setShowEvidence] = useState(false);
 
-  const { documents, refresh } = useDocuments()
+  const { documents, refresh } = useDocuments();
 
-  const { uploadFiles, isUploading, uploadingFileName, error: uploadError, clearError } =
-    useIngest(refresh)
+  const {
+    uploadFiles,
+    isUploading,
+    uploadingFileName,
+    error: uploadError,
+    clearError,
+  } = useIngest(refresh);
 
-  const { submitQuery, isQuerying } = useRagQuery()
+  const { submitQuery, isQuerying } = useRagQuery();
+
+  const handleFilesSelected = useCallback(
+    (files: FileList, tags: string[]) => {
+      uploadFiles(files, undefined, tags);
+    },
+    [uploadFiles],
+  );
 
   const handleSubmitQuery = useCallback(
-    async (question: string) => {
-      setMessages((prev) => [...prev, { role: 'user', content: question }])
-      setCurrentSources([])
+    async (question: string, tags: string[] | null) => {
+      setMessages((prev) => [...prev, { role: "user", content: question }]);
+      setCurrentSources([]);
 
-      const response = await submitQuery(question)
+      const response = await submitQuery(question, tags);
 
       if (response) {
         setMessages((prev) => [
           ...prev,
           {
-            role: 'assistant',
+            role: "assistant",
             content: response.answer,
             sources: response.sources,
           },
-        ])
-        setCurrentSources(response.sources)
+        ]);
+        setCurrentSources(response.sources);
         if (response.sources.length > 0) {
-          setShowEvidence(true)
+          setShowEvidence(true);
         }
       } else {
         setMessages((prev) => [
           ...prev,
           {
-            role: 'assistant',
-            content: 'Sorry, something went wrong. Please try again.',
+            role: "assistant",
+            content: "Sorry, something went wrong. Please try again.",
           },
-        ])
+        ]);
       }
     },
     [submitQuery],
-  )
+  );
 
   return (
     <div className="flex h-screen">
       <div
         className={`transition-all duration-300 ease-in-out ${
-          showEvidence ? 'w-1/2' : 'w-full'
+          showEvidence ? "w-1/2" : "w-full"
         }`}
       >
         <ChatPanel
@@ -68,7 +80,7 @@ function Home() {
           uploadError={uploadError}
           isQuerying={isQuerying}
           onClearUploadError={clearError}
-          onFilesSelected={uploadFiles}
+          onFilesSelected={handleFilesSelected}
           onSubmitQuery={handleSubmitQuery}
         />
       </div>
@@ -79,5 +91,5 @@ function Home() {
         </div>
       )}
     </div>
-  )
+  );
 }

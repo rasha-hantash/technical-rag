@@ -84,18 +84,20 @@ class PgVectorStore:
         author: str | None = None,
         edition: str | None = None,
         publication_year: int | None = None,
+        tags: list[str] | None = None,
     ) -> IngestedDocument:
         metadata = metadata or {}
+        tags = tags or []
         start = time.perf_counter()
         try:
             with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
                     """
-                    INSERT INTO documents (file_hash, file_path, metadata, file_size, title, author, edition, publication_year)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                    RETURNING id, file_hash, file_path, metadata, status, file_size, title, author, edition, publication_year, created_at
+                    INSERT INTO documents (file_hash, file_path, metadata, file_size, title, author, edition, publication_year, tags)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id, file_hash, file_path, metadata, status, file_size, title, author, edition, publication_year, tags, created_at
                     """,
-                    (file_hash, file_path, Json(metadata), file_size, title, author, edition, publication_year),
+                    (file_hash, file_path, Json(metadata), file_size, title, author, edition, publication_year, tags),
                 )
                 row = cur.fetchone()
             self.conn.commit()
@@ -169,25 +171,36 @@ class PgVectorStore:
         self,
         query_embedding: list[float],
         top_k: int = 5,
+        tags: list[str] | None = None,
     ) -> list[SearchResult]:
         self._ensure_vector_registered()
         start = time.perf_counter()
+
+        tag_clause = ""
+        params: list = [query_embedding, query_embedding]
+        if tags:
+            tag_clause = "AND d.tags && %s"
+            params.append(tags)
+        params.append(top_k)
+
         with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
-                """
+                f"""
                 SELECT
                     c.id, c.document_id, c.content, c.chunk_type, c.page_number,
                     c.position, c.embedding, c.bbox, c.section_hierarchy, c.created_at,
                     d.id as doc_id, d.file_hash, d.file_path, d.metadata, d.status, d.file_size,
-                    d.title, d.author, d.edition, d.publication_year, d.created_at as doc_created_at,
+                    d.title, d.author, d.edition, d.publication_year, d.tags,
+                    d.created_at as doc_created_at,
                     1 - (c.embedding <=> %s::vector) as score
                 FROM chunks c
                 JOIN documents d ON c.document_id = d.id
                 WHERE c.embedding IS NOT NULL
+                {tag_clause}
                 ORDER BY c.embedding <=> %s::vector
                 LIMIT %s
                 """,
-                (query_embedding, query_embedding, top_k),
+                params,
             )
             rows = cur.fetchall()
 
@@ -206,33 +219,45 @@ class PgVectorStore:
         self,
         query: str,
         top_k: int = 5,
+        tags: list[str] | None = None,
     ) -> list[SearchResult]:
         """Full-text search using PostgreSQL ts_rank.
 
         Args:
             query: The raw text query to search for.
             top_k: Number of top results to return.
+            tags: Optional tag filter — only search chunks from documents with overlapping tags.
 
         Returns:
             List of SearchResult objects sorted by ts_rank score.
         """
         start = time.perf_counter()
+
+        tag_clause = ""
+        params: list = [query, query]
+        if tags:
+            tag_clause = "AND d.tags && %s"
+            params.append(tags)
+        params.append(top_k)
+
         with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
-                """
+                f"""
                 SELECT
                     c.id, c.document_id, c.content, c.chunk_type, c.page_number,
                     c.position, c.embedding, c.bbox, c.section_hierarchy, c.created_at,
                     d.id as doc_id, d.file_hash, d.file_path, d.metadata, d.status, d.file_size,
-                    d.title, d.author, d.edition, d.publication_year, d.created_at as doc_created_at,
+                    d.title, d.author, d.edition, d.publication_year, d.tags,
+                    d.created_at as doc_created_at,
                     ts_rank(c.search_vector, plainto_tsquery('english', %s)) as score
                 FROM chunks c
                 JOIN documents d ON c.document_id = d.id
                 WHERE c.search_vector @@ plainto_tsquery('english', %s)
+                {tag_clause}
                 ORDER BY score DESC
                 LIMIT %s
                 """,
-                (query, query, top_k),
+                params,
             )
             rows = cur.fetchall()
 
@@ -254,6 +279,7 @@ class PgVectorStore:
         query: str,
         top_k: int = 5,
         rrf_k: int = 60,
+        tags: list[str] | None = None,
     ) -> list[SearchResult]:
         """Hybrid search combining vector similarity and BM25 full-text search.
 
@@ -266,6 +292,7 @@ class PgVectorStore:
             query: The raw text query for full-text search.
             top_k: Number of final results to return.
             rrf_k: RRF smoothing constant (default 60 is standard).
+            tags: Optional tag filter — only search chunks from documents with overlapping tags.
 
         Returns:
             List of SearchResult objects sorted by fused RRF score.
@@ -274,8 +301,8 @@ class PgVectorStore:
 
         fetch_k = top_k * 3
 
-        vector_results = self.similarity_search(query_embedding, top_k=fetch_k)
-        bm25_results = self._bm25_search(query, top_k=fetch_k)
+        vector_results = self.similarity_search(query_embedding, top_k=fetch_k, tags=tags)
+        bm25_results = self._bm25_search(query, top_k=fetch_k, tags=tags)
 
         rrf_scores: dict[str, float] = {}
         result_map: dict[str, SearchResult] = {}
@@ -343,6 +370,7 @@ class PgVectorStore:
                 author=row.get("author"),
                 edition=row.get("edition"),
                 publication_year=row.get("publication_year"),
+                tags=row.get("tags", []),
                 created_at=row["doc_created_at"],
             )
             results.append(SearchResult(chunk=chunk, score=row["score"], document=document))
@@ -351,7 +379,7 @@ class PgVectorStore:
     def get_documents(self) -> list[IngestedDocument]:
         with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
-                "SELECT id, file_hash, file_path, metadata, status, file_size, title, author, edition, publication_year, created_at FROM documents ORDER BY created_at DESC"
+                "SELECT id, file_hash, file_path, metadata, status, file_size, title, author, edition, publication_year, tags, created_at FROM documents ORDER BY created_at DESC"
             )
             rows = cur.fetchall()
         return [IngestedDocument(**row) for row in rows]
@@ -359,7 +387,7 @@ class PgVectorStore:
     def get_document_by_hash(self, file_hash: str) -> IngestedDocument | None:
         with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
-                "SELECT id, file_hash, file_path, metadata, status, file_size, title, author, edition, publication_year, created_at FROM documents WHERE file_hash = %s",
+                "SELECT id, file_hash, file_path, metadata, status, file_size, title, author, edition, publication_year, tags, created_at FROM documents WHERE file_hash = %s",
                 (file_hash,),
             )
             row = cur.fetchone()
@@ -376,6 +404,7 @@ class PgVectorStore:
         author: str | None = None,
         edition: str | None = None,
         publication_year: int | None = None,
+        tags: list[str] | None = None,
     ) -> tuple[IngestedDocument, list[ChunkRecord]]:
         """Insert a document and its chunks atomically in a single transaction.
 
@@ -389,11 +418,13 @@ class PgVectorStore:
             author: Optional book author.
             edition: Optional book edition.
             publication_year: Optional publication year.
+            tags: Optional list of topic tags.
 
         Returns:
             Tuple of (IngestedDocument, list of inserted ChunkRecords).
         """
         metadata = metadata or {}
+        tags = tags or []
         self._ensure_vector_registered()
         start = time.perf_counter()
 
@@ -402,11 +433,11 @@ class PgVectorStore:
                 # Insert document
                 cur.execute(
                     """
-                    INSERT INTO documents (file_hash, file_path, metadata, status, file_size, title, author, edition, publication_year)
-                    VALUES (%s, %s, %s, 'processed', %s, %s, %s, %s, %s)
-                    RETURNING id, file_hash, file_path, metadata, status, file_size, title, author, edition, publication_year, created_at
+                    INSERT INTO documents (file_hash, file_path, metadata, status, file_size, title, author, edition, publication_year, tags)
+                    VALUES (%s, %s, %s, 'processed', %s, %s, %s, %s, %s, %s)
+                    RETURNING id, file_hash, file_path, metadata, status, file_size, title, author, edition, publication_year, tags, created_at
                     """,
-                    (file_hash, file_path, Json(metadata), file_size, title, author, edition, publication_year),
+                    (file_hash, file_path, Json(metadata), file_size, title, author, edition, publication_year, tags),
                 )
                 doc_row = cur.fetchone()
                 doc = IngestedDocument(**doc_row)

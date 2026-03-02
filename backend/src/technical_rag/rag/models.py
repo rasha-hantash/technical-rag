@@ -17,6 +17,7 @@ class IngestedDocument(BaseModel):
     author: str | None = None
     edition: str | None = None
     publication_year: int | None = None
+    tags: list[str] = Field(default_factory=list)
     created_at: datetime
 
 

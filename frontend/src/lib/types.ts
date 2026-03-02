@@ -10,6 +10,7 @@ export interface SourceResponse {
   book_title: string | null;
   book_author: string | null;
   publication_year: number | null;
+  tags: string[];
 }
 
 export interface QueryResponse {
@@ -44,6 +45,7 @@ export interface DocumentResponse {
   author: string | null;
   edition: string | null;
   publication_year: number | null;
+  tags: string[];
 }
 
 export interface BookMetadata {

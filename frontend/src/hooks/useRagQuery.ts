@@ -1,34 +1,40 @@
-import { useState, useCallback } from 'react'
-import { queryRag } from '../lib/api'
-import type { QueryResponse } from '../lib/types'
+import { useState, useCallback } from "react";
+import { queryRag } from "../lib/api";
+import type { QueryResponse } from "../lib/types";
 
 interface UseRagQueryReturn {
-  submitQuery: (question: string) => Promise<QueryResponse | null>
-  isQuerying: boolean
-  error: string | null
+  submitQuery: (
+    question: string,
+    tags?: string[] | null,
+  ) => Promise<QueryResponse | null>;
+  isQuerying: boolean;
+  error: string | null;
 }
 
 export function useRagQuery(): UseRagQueryReturn {
-  const [isQuerying, setIsQuerying] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [isQuerying, setIsQuerying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const submitQuery = useCallback(
-    async (question: string): Promise<QueryResponse | null> => {
-      setIsQuerying(true)
-      setError(null)
+    async (
+      question: string,
+      tags?: string[] | null,
+    ): Promise<QueryResponse | null> => {
+      setIsQuerying(true);
+      setError(null);
 
       try {
-        const response = await queryRag(question)
-        return response
+        const response = await queryRag(question, 5, tags);
+        return response;
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Query failed')
-        return null
+        setError(e instanceof Error ? e.message : "Query failed");
+        return null;
       } finally {
-        setIsQuerying(false)
+        setIsQuerying(false);
       }
     },
     [],
-  )
+  );
 
-  return { submitQuery, isQuerying, error }
+  return { submitQuery, isQuerying, error };
 }
