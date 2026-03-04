@@ -390,7 +390,11 @@ def search(
     retriever: RAGRetriever = Depends(get_retriever),
 ):
     """Search for relevant chunks without generating an answer (retrieval only)."""
-    results = retriever.retrieve(request.question, top_k=request.top_k, tags=request.tags)
+    try:
+        results = retriever.retrieve(request.question, top_k=request.top_k, tags=request.tags)
+    except Exception as e:
+        logger.error("search retrieval failed", error=str(e))
+        raise HTTPException(status_code=500, detail=f"Retrieval failed: {type(e).__name__}")
     return SearchResponse(
         sources=[
             SourceResponse(
