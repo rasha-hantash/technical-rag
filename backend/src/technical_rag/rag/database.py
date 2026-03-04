@@ -23,6 +23,7 @@ class PgVectorStore:
     def connect(self):
         start = time.perf_counter()
         self.conn = psycopg2.connect(self.connection_string)
+        self.conn.autocommit = True
         duration_ms = (time.perf_counter() - start) * 1000
         logger.info("connected to database", duration_ms=round(duration_ms, 2))
 
@@ -58,6 +59,7 @@ class PgVectorStore:
         start = time.perf_counter()
         try:
             with self.conn.cursor() as cur:
+                cur.execute("BEGIN")
                 for migration_file in migration_files:
                     sql = migration_file.read_text()
                     cur.execute(sql)
@@ -430,6 +432,7 @@ class PgVectorStore:
 
         try:
             with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("BEGIN")
                 # Insert document
                 cur.execute(
                     """
