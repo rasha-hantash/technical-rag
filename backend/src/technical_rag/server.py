@@ -66,6 +66,17 @@ class QueryResponse(BaseModel):
     chunks_used: int
 
 
+class SearchRequest(BaseModel):
+    question: str = Field(..., min_length=1, max_length=10000)
+    top_k: int = Field(default=5, ge=1, le=20)
+    tags: list[str] | None = Field(default=None, description="Tag filter. None or omitted searches all books.")
+
+
+class SearchResponse(BaseModel):
+    sources: list[SourceResponse]
+    chunks_retrieved: int
+
+
 class BatchIngestItemResponse(BaseModel):
     file_name: str
     document_id: UUID | None = None
@@ -370,6 +381,35 @@ def query(
             for s in response.sources
         ],
         chunks_used=response.chunks_used,
+    )
+
+
+@app.post("/api/v1/rag/search", response_model=SearchResponse)
+def search(
+    request: SearchRequest,
+    retriever: RAGRetriever = Depends(get_retriever),
+):
+    """Search for relevant chunks without generating an answer (retrieval only)."""
+    results = retriever.retrieve(request.question, top_k=request.top_k, tags=request.tags)
+    return SearchResponse(
+        sources=[
+            SourceResponse(
+                chunk_id=r.chunk.id,
+                document_id=r.document.id if r.document else None,
+                file_path=r.document.file_path if r.document else "",
+                page_number=r.chunk.page_number,
+                content=r.chunk.content,
+                content_preview=r.chunk.content[:200] if r.chunk.content else "",
+                bbox=r.chunk.bbox,
+                section_hierarchy=r.chunk.section_hierarchy,
+                book_title=r.document.title if r.document else None,
+                book_author=r.document.author if r.document else None,
+                publication_year=r.document.publication_year if r.document else None,
+                tags=r.document.tags if r.document else [],
+            )
+            for r in results
+        ],
+        chunks_retrieved=len(results),
     )
 
 
