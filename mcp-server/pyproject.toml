@@ -1,0 +1,10 @@
+[project]
+name = "technical-rag-mcp"
+version = "0.1.0"
+description = "MCP server wrapping the Technical RAG FastAPI backend"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "httpx>=0.28.1",
+    "mcp[cli]>=1.26.0",
+]
